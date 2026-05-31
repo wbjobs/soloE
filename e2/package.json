@@ -1,0 +1,15 @@
+{
+  "name": "audio-fft-wasm",
+  "version": "1.0.0",
+  "description": "Audio spectrum visualization using Rust WebAssembly FFT",
+  "main": "index.html",
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "build:release": "wasm-pack build --target web --out-dir pkg --release",
+    "serve": "python -m http.server 8080",
+    "start": "npm run build && npm run serve"
+  },
+  "keywords": ["wasm", "rust", "fft", "audio", "spectrum"],
+  "author": "",
+  "license": "MIT"
+}
