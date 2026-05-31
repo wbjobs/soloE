@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU 2D 流体模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    .info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: white;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .controls input[type="range"] {
+      width: 150px;
+      margin: 8px 0;
+    }
+    .controls label {
+      display: block;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="info">
+    <p>点击并拖拽鼠标对流体施加力</p>
+    <p id="particleCount"></p>
+  </div>
+  <div class="controls">
+    <label for="viscosity">粘度: <span id="viscosityValue">0.998</span></label>
+    <input type="range" id="viscosity" min="0.9" max="0.9999" step="0.0001" value="0.998">
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
