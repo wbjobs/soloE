@@ -1,0 +1,7 @@
+E:\soloE\e68\target\debug\deps\futures_io-432963ab62665d6c.d: C:\Users\61910\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-io-0.3.32\src\lib.rs
+
+E:\soloE\e68\target\debug\deps\libfutures_io-432963ab62665d6c.rlib: C:\Users\61910\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-io-0.3.32\src\lib.rs
+
+E:\soloE\e68\target\debug\deps\libfutures_io-432963ab62665d6c.rmeta: C:\Users\61910\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-io-0.3.32\src\lib.rs
+
+C:\Users\61910\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-io-0.3.32\src\lib.rs:

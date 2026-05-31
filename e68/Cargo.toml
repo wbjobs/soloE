@@ -1,0 +1,21 @@
+[package]
+name = "rudp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+rand = "0.8"
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+bytes = "1.0"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+humantime = "2.0"
+indicatif = "0.17"
+
+[[bin]]
+name = "rudp"
+path = "src/main.rs"
