@@ -1,0 +1,181 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>个人健康数据平台</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem;
+      }
+      
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      
+      h1 {
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+        font-size: 2.5rem;
+      }
+      
+      .card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      }
+      
+      .card h2 {
+        color: #333;
+        margin-bottom: 1.5rem;
+        font-size: 1.5rem;
+      }
+      
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+      }
+      
+      .stat-item {
+        text-align: center;
+        padding: 1.5rem;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      }
+      
+      .stat-item.steps {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      
+      .stat-item.heart {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+      }
+      
+      .stat-value {
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+      
+      .stat-label {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+      
+      .info {
+        color: #666;
+        text-align: center;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+      }
+      
+      .loading {
+        text-align: center;
+        color: #666;
+        padding: 2rem;
+      }
+      
+      .refresh-btn {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-top: 1rem;
+        transition: transform 0.2s;
+      }
+      
+      .refresh-btn:hover {
+        transform: translateY(-2px);
+      }
+      
+      .refresh-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏃 个人健康数据平台</h1>
+      
+      <div class="card">
+        <h2>📊 近7天健康摘要</h2>
+        <div id="stats-container" class="loading">
+          加载中...
+        </div>
+        <button class="refresh-btn" id="refresh-btn" onclick="fetchData()">
+          🔄 刷新数据
+        </button>
+        <div id="generated-at" class="info"></div>
+      </div>
+      
+      <div class="card">
+        <h2>ℹ️ 说明</h2>
+        <p class="info">
+          数据每小时自动从数据源同步。您也可以点击上方按钮手动刷新。
+        </p>
+      </div>
+    </div>
+    
+    <script>
+      async function fetchData() {
+        const container = document.getElementById('stats-container');
+        const btn = document.getElementById('refresh-btn');
+        const generatedAt = document.getElementById('generated-at');
+        
+        btn.disabled = true;
+        container.innerHTML = '<div class="loading">加载中...</div>';
+        
+        try {
+          const response = await fetch('http://localhost:8080/api/v1/summary');
+          const data = await response.json();
+          
+          container.innerHTML = `
+            <div class="stats-grid">
+              <div class="stat-item steps">
+                <div class="stat-value">${Math.round(data.average_steps_last_7_days)}</div>
+                <div class="stat-label">平均步数 / 天</div>
+              </div>
+              <div class="stat-item heart">
+                <div class="stat-value">${data.max_heart_rate_last_7_days}</div>
+                <div class="stat-label">最高心率 (bpm)</div>
+              </div>
+            </div>
+          `;
+          
+          generatedAt.textContent = `数据更新时间: ${new Date(data.generated_at).toLocaleString('zh-CN')}`;
+        } catch (error) {
+          container.innerHTML = `<div class="loading">加载失败: ${error.message}</div>`;
+        }
+        
+        btn.disabled = false;
+      }
+      
+      fetchData();
+    </script>
+  </body>
+</html>
