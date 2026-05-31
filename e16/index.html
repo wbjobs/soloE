@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>迷宫生成与寻路算法可视化</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🧩 迷宫生成与寻路算法可视化</h1>
+    <p class="subtitle">递归回溯算法 × A* 寻路算法</p>
+    
+    <div class="game-wrapper">
+      <div id="gameContainer"></div>
+    </div>
+    
+    <div class="controls">
+      <div class="select-wrapper">
+        <label for="algorithmSelect">选择迷宫生成算法：</label>
+        <select id="algorithmSelect" class="algorithm-select">
+        </select>
+      </div>
+      <button id="generateBtn" class="btn btn-primary" onclick="generateMaze()">
+        🔄 生成迷宫
+      </button>
+      <button id="pathBtn" class="btn btn-success" onclick="startPathfinding()">
+        🚀 开始寻路
+      </button>
+    </div>
+    
+    <div id="status" class="status">
+      正在加载...
+    </div>
+    
+    <div class="legends">
+      <div class="legend-item">
+        <div class="legend-color legend-wall"></div>
+        <span>墙壁</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-path"></div>
+        <span>通道</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-closed"></div>
+        <span>已探索</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-open"></div>
+        <span>待探索</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-final"></div>
+        <span>最终路径</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-start-end"></div>
+        <span>起点/终点</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="js/MazeGenerator.js"></script>
+  <script src="js/PathFinder.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
