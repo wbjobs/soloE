@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  min-height: 100vh;
+  color: #e2e8f0;
+}
+
+.node {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.node circle {
+  stroke: #fff;
+  stroke-width: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.node text {
+  font-size: 12px;
+  fill: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.node-unvisited circle {
+  fill: #64748b;
+}
+
+.node-visited circle {
+  fill: #10b981;
+}
+
+.node-current circle {
+  fill: #f59e0b;
+  animation: pulse 1s infinite;
+}
+
+.node-path circle {
+  fill: #ec4899;
+  animation: pathGlow 1.5s infinite;
+}
+
+.node-start circle {
+  fill: #3b82f6;
+  stroke-width: 3px;
+}
+
+.node-target circle {
+  fill: #ef4444;
+  stroke-width: 3px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    r: 20;
+    filter: drop-shadow(0 0 8px #f59e0b);
+  }
+  50% {
+    r: 24;
+    filter: drop-shadow(0 0 16px #f59e0b);
+  }
+}
+
+@keyframes pathGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px #ec4899);
+  }
+  50% {
+    filter: drop-shadow(0 0 12px #ec4899);
+  }
+}
+
+.edge {
+  stroke: #475569;
+  stroke-width: 2px;
+  transition: stroke 0.3s ease, stroke-width 0.3s ease;
+}
+
+.edge-active {
+  stroke: #3b82f6;
+  stroke-width: 3px;
+}
+
+.edge-path {
+  stroke: #ec4899;
+  stroke-width: 4px;
+  filter: drop-shadow(0 0 6px #ec4899);
+  animation: pathEdgeGlow 1.5s infinite;
+}
+
+@keyframes pathEdgeGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px #ec4899);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px #ec4899);
+  }
+}
+
+.controls-bg {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(100, 116, 139, 0.4);
+}
+
+.status-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: #334155;
+  outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
