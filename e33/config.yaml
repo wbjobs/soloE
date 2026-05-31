@@ -1,0 +1,13 @@
+server:
+  host: localhost
+  port: 443
+  path: /
+  method: GET
+  insecure: true
+
+concurrency: 100
+requests_per_second: 1000
+request_body_size_bytes: 0
+request_count: 0
+duration_seconds: 60
+output_csv_file: report.csv
