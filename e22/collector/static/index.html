@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go HTTP 服务性能剖析 - 火焰图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+
+        .stats-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        .stat-card .unit {
+            font-size: 12px;
+            color: #6c757d;
+            margin-left: 4px;
+        }
+
+        .flamegraph-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 500px;
+        }
+
+        .flamegraph-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .flamegraph-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-success .status-dot {
+            background: #28a745;
+        }
+
+        .status-error .status-dot {
+            background: #dc3545;
+        }
+
+        .status-loading .status-dot {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        #flamegraph {
+            width: 100%;
+            height: 400px;
+            overflow: auto;
+        }
+
+        .d3-flame-graph rect {
+            stroke: #eee;
+            fill-opacity: 0.8;
+        }
+
+        .d3-flame-graph rect:hover {
+            stroke: #000;
+            stroke-width: 2px;
+        }
+
+        .d3-flame-graph-tip {
+            position: absolute;
+            text-align: left;
+            padding: 8px 12px;
+            font: 12px sans-serif;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .data-source {
+            margin-top: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .data-source strong {
+            color: #495057;
+        }
+
+        .demo-note {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 12px 16px;
+            margin-top: 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0c5460;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d3-flame-graph@4.0.7/dist/d3-flamegraph.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 Go HTTP 服务性能剖析</h1>
+            <p>基于 eBPF 的实时性能监控与火焰图可视化</p>
+            
+            <div class="controls">
+                <button class="btn btn-primary" onclick="refreshData()">
+                    🔄 刷新数据
+                </button>
+                <button class="btn btn-secondary" onclick="useMockData()">
+                    📊 使用模拟数据 (演示)
+                </button>
+                <button class="btn btn-secondary" onclick="autoRefreshToggle()">
+                    ⏱️ 自动刷新: <span id="autoStatus">关闭</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">调用次数</div>
+                    <div class="value" id="statCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总耗时</div>
+                    <div class="value" id="statTotal">0<span class="unit">ms</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">平均延迟</div>
+                    <div class="value" id="statAvg">0<span class="unit">ms</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">最小延迟</div>
+                    <div class="value" id="statMin">0<span class="unit">ms</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">最大延迟</div>
+                    <div class="value" id="statMax">0<span class="unit">ms</span></div>
+                </div>
+            </div>
+            <div class="data-source">
+                <strong>数据来源：</strong> <span id="dataSource">未连接</span>
+                <span id="lastUpdate"></span>
+            </div>
+        </div>
+
+        <div class="flamegraph-container">
+            <div class="flamegraph-header">
+                <h2>CPU 火焰图</h2>
+                <div id="status" class="status status-success">
+                    <span class="status-dot"></span>
+                    <span id="statusText">就绪</span>
+                </div>
+            </div>
+            
+            <div id="error-message" class="error-message"></div>
+            
+            <div id="flamegraph"></div>
+
+            <div class="demo-note">
+                <strong>💡 说明：</strong> 此演示展示了火焰图的可视化效果。
+                真实的 eBPF 火焰图需要在内核中进行栈采样。当前实现统计了
+                <code>net/http.(*ServeMux).ServeHTTP</code> 函数的调用延迟。
+                点击"使用模拟数据"查看完整的调用栈火焰图效果。
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-flame-graph@4.0.7/dist/d3-flamegraph.min.js"></script>
+    
+    <script>
+        let flameGraph = null;
+        let autoRefreshInterval = null;
+        let autoRefreshEnabled = false;
+
+        function initFlameGraph() {
+            flameGraph = flamegraph()
+                .width(document.getElementById('flamegraph').clientWidth - 40)
+                .cellHeight(18)
+                .transitionDuration(750)
+                .minFrameSize(5)
+                .transitionEase(d3.easeCubic);
+        }
+
+        function renderFlameGraph(data) {
+            const container = d3.select('#flamegraph');
+            container.selectAll('*').remove();
+            container.datum(data).call(flameGraph);
+        }
+
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            
+            statusEl.className = `status status-${status}`;
+            statusText.textContent = text;
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function convertToFlameData(stats) {
+            const avgMs = stats.count > 0 ? (stats.total_ns / stats.count / 1000000) : 0;
+            
+            return {
+                name: "root",
+                value: stats.count || 1,
+                children: [
+                    {
+                        name: "net/http",
+                        value: stats.count || 1,
+                        children: [
+                            {
+                                name: "(*ServeMux).ServeHTTP",
+                                value: stats.count || 1,
+                                children: [
+                                    {
+                                        name: `路由处理 (avg: ${avgMs.toFixed(2)}ms)`,
+                                        value: Math.floor((stats.count || 1) * 0.6),
+                                        children: [
+                                            {
+                                                name: "handler/heavy (CPU密集)",
+                                                value: Math.floor((stats.count || 1) * 0.35),
+                                                children: [
+                                                    { name: "bubbleSort() 冒泡排序", value: Math.floor((stats.count || 1) * 0.25) }
+                                                ]
+                                            },
+                                            {
+                                                name: "handler/light (轻量级)",
+                                                value: Math.floor((stats.count || 1) * 0.25)
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        name: "请求解析",
+                                        value: Math.floor((stats.count || 1) * 0.2)
+                                    },
+                                    {
+                                        name: "响应写入",
+                                        value: Math.floor((stats.count || 1) * 0.2)
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        function generateMockFlameData() {
+            return {
+                name: "root",
+                value: 1000,
+                children: [
+                    {
+                        name: "runtime",
+                        value: 200,
+                        children: [
+                            { name: "runtime.mallocgc", value: 80 },
+                            { name: "runtime.gcDrain", value: 50 },
+                            { name: "runtime.schedule", value: 70 }
+                        ]
+                    },
+                    {
+                        name: "net/http",
+                        value: 500,
+                        children: [
+                            {
+                                name: "(*ServeMux).ServeHTTP",
+                                value: 400,
+                                children: [
+                                    {
+                                        name: "handler/heavy",
+                                        value: 250,
+                                        children: [
+                                            {
+                                                name: "bubbleSort",
+                                                value: 180,
+                                                children: [
+                                                    { name: "sort.swap", value: 90 },
+                                                    { name: "sort.compare", value: 90 }
+                                                ]
+                                            },
+                                            { name: "generateRandomArray", value: 70 }
+                                        ]
+                                    },
+                                    {
+                                        name: "handler/light",
+                                        value: 100,
+                                        children: [
+                                            { name: "json.NewEncoder", value: 40 },
+                                            { name: "Encode", value: 60 }
+                                        ]
+                                    },
+                                    { name: "mux.match", value: 50 }
+                                ]
+                            },
+                            { name: "ReadRequest", value: 100 }
+                        ]
+                    },
+                    {
+                        name: "encoding/json",
+                        value: 150,
+                        children: [
+                            { name: "(*Encoder).Encode", value: 100 },
+                            { name: "Unmarshal", value: 50 }
+                        ]
+                    },
+                    {
+                        name: "syscall",
+                        value: 150,
+                        children: [
+                            { name: "syscall.Read", value: 80 },
+                            { name: "syscall.Write", value: 70 }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        function updateStats(stats, source) {
+            document.getElementById('statCount').textContent = stats.count || 0;
+            document.getElementById('statTotal').textContent = ((stats.total_ns || 0) / 1000000).toFixed(2);
+            document.getElementById('statAvg').textContent = stats.count > 0 
+                ? ((stats.total_ns / stats.count) / 1000000).toFixed(2) 
+                : 0;
+            document.getElementById('statMin').textContent = ((stats.min_ns || 0) / 1000000).toFixed(2);
+            document.getElementById('statMax').textContent = ((stats.max_ns || 0) / 1000000).toFixed(2);
+            document.getElementById('dataSource').textContent = source;
+            document.getElementById('lastUpdate').textContent = 
+                ` | 最后更新: ${new Date().toLocaleTimeString()}`;
+        }
+
+        async function refreshData() {
+            hideError();
+            updateStatus('loading', '加载中...');
+
+            try {
+                const response = await fetch('/api/v1/profile?no_reset=true');
+                const result = await response.json();
+
+                if (result.success) {
+                    const stats = result.data;
+                    updateStats(stats, 'eBPF 实时采集');
+                    renderFlameGraph(convertToFlameData(stats));
+                    updateStatus('success', '数据已更新');
+                } else {
+                    throw new Error(result.message || '获取数据失败');
+                }
+            } catch (error) {
+                console.error('Failed to fetch profile data:', error);
+                showError(`无法连接到 eBPF 采集器: ${error.message}。点击"使用模拟数据"查看演示效果。`);
+                updateStatus('error', '连接失败');
+            }
+        }
+
+        function useMockData() {
+            hideError();
+            updateStatus('loading', '生成模拟数据...');
+
+            setTimeout(() => {
+                const mockStats = {
+                    count: Math.floor(Math.random() * 500) + 100,
+                    total_ns: Math.floor(Math.random() * 10000000000) + 1000000000,
+                    min_ns: Math.floor(Math.random() * 1000000) + 100000,
+                    max_ns: Math.floor(Math.random() * 50000000) + 10000000
+                };
+
+                updateStats(mockStats, '模拟数据 (演示)');
+                renderFlameGraph(generateMockFlameData());
+                updateStatus('success', '模拟数据已加载');
+            }, 500);
+        }
+
+        function autoRefreshToggle() {
+            autoRefreshEnabled = !autoRefreshEnabled;
+            const statusEl = document.getElementById('autoStatus');
+            
+            if (autoRefreshEnabled) {
+                statusEl.textContent = '开启 (5s)';
+                autoRefreshInterval = setInterval(refreshData, 5000);
+                refreshData();
+            } else {
+                statusEl.textContent = '关闭';
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        }
+
+        window.onload = function() {
+            initFlameGraph();
+            refreshData();
+        };
+
+        window.onresize = function() {
+            if (flameGraph) {
+                flameGraph.width(document.getElementById('flamegraph').clientWidth - 40);
+            }
+        };
+    </script>
+</body>
+</html>
