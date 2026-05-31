@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 弹珠台游戏</title>
+  <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <div id="game-container"></div>
+    <div id="hud">
+      <div class="score-panel">
+        <div class="score-label">得分</div>
+        <div class="score-value" id="score">0</div>
+      </div>
+      <div class="controls-info">
+        <div class="control-item">← → 控制挡板</div>
+        <div class="control-item">空格 发射弹珠</div>
+        <div class="control-item">R 重新开始</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
