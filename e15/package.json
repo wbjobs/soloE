@@ -1,0 +1,19 @@
+{
+  "name": "crdt-notes-app",
+  "version": "1.0.0",
+  "description": "Offline-first notes app with CRDT-based conflict resolution",
+  "scripts": {
+    "dev:backend": "cd backend && bun run --watch src/index.ts",
+    "dev:frontend": "cd frontend && bun run dev",
+    "dev": "concurrently \"bun run dev:backend\" \"bun run dev:frontend\"",
+    "build:frontend": "cd frontend && bun run build",
+    "start:backend": "cd backend && bun run src/index.ts",
+    "install:all": "cd frontend && bun install && cd ../backend && bun install"
+  },
+  "keywords": ["crdt", "notes", "offline-first", "solidjs", "elysia"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
