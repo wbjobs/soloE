@@ -1,0 +1,633 @@
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color, #333);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tab-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  padding: 10px 20px;
+  border: none;
+  background: var(--tab-bg, #2a2a2a);
+  color: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: var(--tab-hover, #3a3a3a);
+}
+
+.tab-btn.active {
+  background: #6366f1;
+  color: white;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  background: var(--btn-bg, #374151);
+  color: var(--btn-text, #fff);
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar button:hover:not(:disabled) {
+  background: var(--btn-hover, #4b5563);
+  transform: translateY(-1px);
+}
+
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar .btn-primary {
+  background: #6366f1;
+  color: white;
+}
+
+.toolbar .btn-primary:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 1.1rem;
+  color: var(--text-secondary, #888);
+}
+
+.error {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #fecaca;
+  cursor: pointer;
+}
+
+.close-btn {
+  font-size: 1.5rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.boot-list h2,
+.cert-list h2 {
+  margin-bottom: 20px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #888);
+  font-size: 1.1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--table-bg, #1a1a1a);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+thead {
+  background: var(--thead-bg, #262626);
+}
+
+th, td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+th {
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #aaa);
+}
+
+tbody tr {
+  transition: background 0.2s;
+}
+
+tbody tr:hover {
+  background: var(--row-hover, #252525);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.order-cell {
+  font-weight: 600;
+  color: #6366f1;
+  width: 80px;
+}
+
+.name-cell {
+  font-weight: 500;
+  min-width: 200px;
+}
+
+.path-cell {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #aaa);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.actions-cell {
+  white-space: nowrap;
+  width: 160px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  margin-right: 6px;
+  background: var(--btn-bg, #374151);
+  color: var(--btn-text, #fff);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-small:hover:not(:disabled) {
+  background: var(--btn-hover, #4b5563);
+}
+
+.btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.dialog {
+  background: var(--dialog-bg, #1f2937);
+  border-radius: 12px;
+  padding: 28px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.dialog.warning-dialog {
+  max-width: 550px;
+  border: 2px solid #fbbf24;
+}
+
+.warning-icon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.dialog h3 {
+  margin: 0 0 24px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.warning-content {
+  margin-bottom: 20px;
+}
+
+.warning-content p {
+  margin: 12px 0;
+}
+
+.warning-box {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.warning-box h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+}
+
+.warning-box ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.warning-box li {
+  margin: 6px 0;
+}
+
+.confirm-checkbox {
+  margin: 20px 0;
+  padding: 12px;
+  background: var(--warning-bg, #374151);
+  border-radius: 8px;
+}
+
+.confirm-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.confirm-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #d1d5db);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--input-border, #374151);
+  border-radius: 8px;
+  background: var(--input-bg, #111827);
+  color: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.form-group input::placeholder {
+  color: #6b7280;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: #6366f1;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #4f46e5;
+}
+
+.btn-secondary {
+  background: var(--btn-secondary-bg, #374151);
+  color: inherit;
+}
+
+.btn-secondary:hover {
+  background: var(--btn-secondary-hover, #4b5563);
+}
+
+.secureboot-status {
+  margin-bottom: 24px;
+}
+
+.status-card {
+  background: var(--card-bg, #1f2937);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.status-card h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.status-indicator {
+  padding: 8px 20px;
+  border-radius: 24px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.status-indicator.enabled {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-indicator.disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cert-section {
+  margin-bottom: 32px;
+}
+
+.cert-section h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.db-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.db-badge.db {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.db-badge.dbx {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+}
+
+.cert-card {
+  background: var(--card-bg, #1f2937);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-color, #374151);
+  transition: all 0.2s;
+}
+
+.cert-card:hover {
+  border-color: #6366f1;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.15);
+}
+
+.cert-card.microsoft {
+  border-left: 4px solid #00a4ef;
+}
+
+.cert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.cert-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.microsoft-badge {
+  background: #00a4ef;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cert-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cert-field {
+  display: flex;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.cert-field .label {
+  color: var(--text-secondary, #9ca3af);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.cert-field .value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cert-field .fingerprint {
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.cert-field .issuer {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cert-actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #374151);
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --border-color: #e5e7eb;
+    --text-secondary: #6b7280;
+    --table-bg: #ffffff;
+    --thead-bg: #f9fafb;
+    --row-hover: #f3f4f6;
+    --btn-bg: #e5e7eb;
+    --btn-text: #111827;
+    --btn-hover: #d1d5db;
+    --dialog-bg: #ffffff;
+    --input-border: #d1d5db;
+    --input-bg: #ffffff;
+    --btn-secondary-bg: #e5e7eb;
+    --btn-secondary-hover: #d1d5db;
+    --tab-bg: #f3f4f6;
+    --tab-hover: #e5e7eb;
+    --card-bg: #ffffff;
+    --warning-bg: #fffbeb;
+  }
+
+  .error {
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .status-card {
+    border: 1px solid #e5e7eb;
+  }
+
+  .cert-card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toolbar {
+    width: 100%;
+  }
+
+  .toolbar button {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  table {
+    font-size: 0.85rem;
+  }
+
+  th, td {
+    padding: 12px 8px;
+  }
+
+  .path-cell {
+    max-width: 150px;
+  }
+
+  .cert-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-card {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+}
