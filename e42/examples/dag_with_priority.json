@@ -1,0 +1,78 @@
+{
+  "name": "机器学习工作流-优先级调度",
+  "description": "包含不同优先级任务的机器学习管道，用于演示抢占式调度",
+  "tasks": [
+    {
+      "id": "data_collect_high",
+      "name": "数据源采集(高优先级)",
+      "type": "data_collection",
+      "priority": "high",
+      "endpoint": "",
+      "payload": "{\"source\": \"real_time_data\", \"urgent\": true}",
+      "depends_on": []
+    },
+    {
+      "id": "data_collect_low",
+      "name": "数据源采集(低优先级)",
+      "type": "data_collection",
+      "priority": "low",
+      "endpoint": "",
+      "payload": "{\"source\": \"historical_data\", \"urgent\": false}",
+      "depends_on": []
+    },
+    {
+      "id": "data_clean_high",
+      "name": "数据清洗(高优先级)",
+      "type": "data_cleaning",
+      "priority": "high",
+      "endpoint": "",
+      "payload": "{\"quality\": \"high\"}",
+      "depends_on": ["data_collect_high"]
+    },
+    {
+      "id": "data_clean_low",
+      "name": "数据清洗(低优先级)",
+      "type": "data_cleaning",
+      "priority": "low",
+      "endpoint": "",
+      "payload": "{\"quality\": \"standard\"}",
+      "depends_on": ["data_collect_low"]
+    },
+    {
+      "id": "feature_extract_1",
+      "name": "特征提取(中优先级)",
+      "type": "feature_extraction",
+      "priority": "medium",
+      "endpoint": "",
+      "payload": "{\"method\": \"standard\"}",
+      "depends_on": ["data_clean_high", "data_clean_low"]
+    },
+    {
+      "id": "model_train_critical",
+      "name": "模型训练(高优先级)",
+      "type": "model_training",
+      "priority": "high",
+      "endpoint": "",
+      "payload": "{\"algorithm\": \"fast_xgboost\", \"target\": \"critical_kpi\"}",
+      "depends_on": ["feature_extract_1"]
+    },
+    {
+      "id": "model_train_experimental",
+      "name": "实验性模型训练(低优先级)",
+      "type": "model_training",
+      "priority": "low",
+      "endpoint": "",
+      "payload": "{\"algorithm\": \"deep_neural_network\", \"epochs\": 100}",
+      "depends_on": ["feature_extract_1"]
+    },
+    {
+      "id": "result_aggregation",
+      "name": "结果聚合(高优先级)",
+      "type": "result_aggregation",
+      "priority": "high",
+      "endpoint": "",
+      "payload": "{\"output_format\": \"dashboard\"}",
+      "depends_on": ["model_train_critical", "model_train_experimental"]
+    }
+  ]
+}

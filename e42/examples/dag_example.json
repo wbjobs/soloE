@@ -1,0 +1,96 @@
+{
+  "name": "机器学习工作流",
+  "description": "完整的机器学习管道，包含数据清洗、特征提取、模型训练和结果聚合",
+  "tasks": [
+    {
+      "id": "data_collect_1",
+      "name": "数据源采集-用户数据",
+      "type": "data_collection",
+      "endpoint": "",
+      "payload": "{\"source\": \"user_db\", \"table\": \"users\"}",
+      "depends_on": [],
+      "max_retries": 3
+    },
+    {
+      "id": "data_collect_2",
+      "name": "数据源采集-行为数据",
+      "type": "data_collection",
+      "endpoint": "",
+      "payload": "{\"source\": \"behavior_db\", \"table\": \"events\"}",
+      "depends_on": [],
+      "max_retries": 3
+    },
+    {
+      "id": "data_clean_1",
+      "name": "数据清洗-用户数据",
+      "type": "data_cleaning",
+      "endpoint": "",
+      "payload": "{\"remove_duplicates\": true, \"fill_missing\": true}",
+      "depends_on": ["data_collect_1"],
+      "max_retries": 3
+    },
+    {
+      "id": "data_clean_2",
+      "name": "数据清洗-行为数据",
+      "type": "data_cleaning",
+      "endpoint": "",
+      "payload": "{\"remove_duplicates\": true, \"filter_invalid\": true}",
+      "depends_on": ["data_collect_2"],
+      "max_retries": 3
+    },
+    {
+      "id": "feature_extract_1",
+      "name": "特征提取-用户特征",
+      "type": "feature_extraction",
+      "endpoint": "",
+      "payload": "{\"features\": [\"age\", \"gender\", \"location\"]}",
+      "depends_on": ["data_clean_1"],
+      "max_retries": 3
+    },
+    {
+      "id": "feature_extract_2",
+      "name": "特征提取-行为特征",
+      "type": "feature_extraction",
+      "endpoint": "",
+      "payload": "{\"features\": [\"click_rate\", \"duration\", \"frequency\"]}",
+      "depends_on": ["data_clean_2"],
+      "max_retries": 3
+    },
+    {
+      "id": "feature_merge",
+      "name": "特征合并",
+      "type": "feature_merging",
+      "endpoint": "",
+      "payload": "{\"join_key\": \"user_id\"}",
+      "depends_on": ["feature_extract_1", "feature_extract_2"],
+      "max_retries": 3
+    },
+    {
+      "id": "model_train_1",
+      "name": "模型训练-分类模型",
+      "type": "model_training",
+      "endpoint": "",
+      "payload": "{\"algorithm\": \"random_forest\", \"target\": \"churn\"}",
+      "depends_on": ["feature_merge"],
+      "max_retries": 3
+    },
+    {
+      "id": "model_train_2",
+      "name": "模型训练-回归模型",
+      "type": "model_training",
+      "endpoint": "",
+      "payload": "{\"algorithm\": \"xgboost\", \"target\": \"revenue\"}",
+      "depends_on": ["feature_merge"],
+      "max_retries": 3
+    },
+    {
+      "id": "result_aggregation",
+      "name": "结果聚合与报告",
+      "type": "result_aggregation",
+      "endpoint": "",
+      "payload": "{\"output_format\": \"html\", \"send_email\": true}",
+      "depends_on": ["model_train_1", "model_train_2"],
+      "max_retries": 3
+    }
+  ]
+}
