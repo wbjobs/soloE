@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>脑图在线编辑器</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .mindmap-app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5f5;
+        }
+
+        .mindmap-header {
+            background: white;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mindmap-header h1 {
+            font-size: 20px;
+            color: #667eea;
+            margin: 0;
+        }
+
+        .mindmap-toolbar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background:
+                linear-gradient(90deg, #f0f0f0 1px, transparent 1px),
+                linear-gradient(#f0f0f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #mindmapCanvas {
+            min-width: 2000px;
+            min-height: 1500px;
+            position: relative;
+        }
+
+        .mindmap-node {
+            position: absolute;
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: move;
+            user-select: none;
+            min-width: 120px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: box-shadow 0.2s, transform 0.1s;
+            z-index: 10;
+        }
+
+        .mindmap-node:hover {
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+            z-index: 20;
+        }
+
+        .mindmap-node.selected {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.3);
+            z-index: 30;
+        }
+
+        .mindmap-node.root {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+            font-size: 18px;
+            font-weight: bold;
+            min-width: 200px;
+        }
+
+        .mindmap-node.level-1 {
+            background: #fff;
+            border-color: #667eea;
+            font-size: 14px;
+        }
+
+        .mindmap-node.level-2 {
+            background: #f8f9ff;
+            border-color: #a0aec0;
+            font-size: 13px;
+        }
+
+        .mindmap-node.level-3 {
+            background: #f8f9fa;
+            border-color: #cbd5e0;
+            font-size: 12px;
+        }
+
+        .node-actions {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 4px;
+            background: white;
+            padding: 4px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .mindmap-node.selected .node-actions {
+            display: flex;
+        }
+
+        .node-action-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .node-action-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .node-action-btn.add {
+            background: #48bb78;
+            color: white;
+        }
+
+        .node-action-btn.edit {
+            background: #4299e1;
+            color: white;
+        }
+
+        .node-action-btn.delete {
+            background: #f56565;
+            color: white;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: #667eea;
+            transform-origin: left center;
+            z-index: 5;
+            border-radius: 2px;
+        }
+
+        .connection-line.level-1 {
+            background: #667eea;
+            height: 3px;
+        }
+
+        .connection-line.level-2 {
+            background: #a0aec0;
+            height: 2px;
+        }
+
+        .connection-line.level-3 {
+            background: #cbd5e0;
+            height: 1px;
+        }
+
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 60px;
+            width: 300px;
+            background: white;
+            height: calc(100vh - 60px);
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            z-index: 100;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar h3 {
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn-icon {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-icon.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-icon.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-icon.danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .load-meeting-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .load-meeting-modal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .meeting-list-item {
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .meeting-list-item:hover {
+            background: #f8f9ff;
+            border-color: #667eea;
+        }
+
+        .meeting-list-item .title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .meeting-list-item .meta {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .back-btn:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="mindmap-app">
+        <div class="mindmap-header">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <button class="back-btn" onclick="window.location.href='index.html'">
+                    ← 返回
+                </button>
+                <h1>🧠 脑图在线编辑器</h1>
+            </div>
+            <div class="mindmap-toolbar">
+                <button class="btn-icon primary" onclick="loadMeetingModal()">
+                    📂 从会议导入
+                </button>
+                <button class="btn-icon secondary" onclick="addRootNode()">
+                    ➕ 新建根节点
+                </button>
+                <button class="btn-icon secondary" onclick="toggleSidebar()">
+                    ⚙️ 属性
+                </button>
+                <button class="btn-icon primary" onclick="exportMarkdown()">
+                    📥 导出 Markdown
+                </button>
+                <button class="btn-icon secondary" onclick="exportJSON()">
+                    💾 导出 JSON
+                </button>
+                <button class="btn-icon secondary" onclick="importJSON()">
+                    📂 导入 JSON
+                </button>
+                <button class="btn-icon secondary" onclick="clearCanvas()">
+                    🗑️ 清空
+                </button>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <div id="mindmapCanvas">
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebar">
+            <h3>节点属性</h3>
+            <div id="nodeProperties">
+                <p style="color: #999;">选择一个节点以编辑属性</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="load-meeting-modal" id="loadMeetingModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>选择会议导入</h2>
+                <button class="close-btn" onclick="closeLoadModal()">&times;</button>
+            </div>
+            <div id="meetingListForImport">
+                <p style="color: #999;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let nodes = [];
+        let connections = [];
+        let selectedNode = null;
+        let nodeIdCounter = 1;
+        let isDragging = false;
+        let dragNode = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+
+        function init() {
+            const canvas = document.getElementById('mindmapCanvas');
+            
+            canvas.addEventListener('mousedown', handleCanvasMouseDown);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            
+            document.getElementById('canvasContainer').addEventListener('scroll', () => {
+                canvasOffsetX = document.getElementById('canvasContainer').scrollLeft;
+                canvasOffsetY = document.getElementById('canvasContainer').scrollTop;
+            });
+        }
+
+        function generateId() {
+            return 'node_' + (nodeIdCounter++);
+        }
+
+        function addRootNode() {
+            const id = generateId();
+            const node = {
+                id: id,
+                text: '中心主题',
+                x: 500,
+                y: 300,
+                level: 0,
+                parentId: null
+            };
+            nodes.push(node);
+            renderNode(node);
+        }
+
+        function addChildNode(parentId) {
+            const parent = nodes.find(n => n.id === parentId);
+            if (!parent) return;
+
+            const id = generateId();
+            const childCount = nodes.filter(n => n.parentId === parentId).length;
+            
+            const level = parent.level + 1;
+            const direction = childCount % 2 === 0 ? 1 : -1;
+            const offsetY = Math.floor(childCount / 2) * 80 * direction;
+            
+            const node = {
+                id: id,
+                text: '新节点',
+                x: parent.x + 250,
+                y: parent.y + offsetY,
+                level: level,
+                parentId: parentId
+            };
+            nodes.push(node);
+            renderNode(node);
+            updateConnections();
+        }
+
+        function renderNode(node) {
+            const canvas = document.getElementById('mindmapCanvas');
+            
+            let el = document.getElementById(node.id);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = node.id;
+                el.className = `mindmap-node level-${node.level} ${node.level === 0 ? 'root' : ''}`;
+                el.innerHTML = `
+                    <div class="node-actions">
+                        <button class="node-action-btn add" title="添加子节点" onclick="event.stopPropagation(); addChildNode('${node.id}')">+</button>
+                        <button class="node-action-btn edit" title="编辑" onclick="event.stopPropagation(); editNode('${node.id}')">✎</button>
+                        <button class="node-action-btn delete" title="删除" onclick="event.stopPropagation(); deleteNode('${node.id}')">×</button>
+                    </div>
+                    <span class="node-text">${node.text}</span>
+                `;
+                canvas.appendChild(el);
+            }
+
+            el.style.left = node.x + 'px';
+            el.style.top = node.y + 'px';
+            
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('node-action-btn')) return;
+                startDrag(e, node);
+            });
+
+            el.addEventListener('click', (e) => {
+                if (e.target.classList.contains('node-action-btn')) return;
+                selectNode(node);
+            });
+
+            el.querySelector('.node-text').textContent = node.text;
+        }
+
+        function selectNode(node) {
+            document.querySelectorAll('.mindmap-node').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            const el = document.getElementById(node.id);
+            if (el) {
+                el.classList.add('selected');
+            }
+            
+            selectedNode = node;
+            showNodeProperties(node);
+        }
+
+        function showNodeProperties(node) {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.add('open');
+            
+            document.getElementById('nodeProperties').innerHTML = `
+                <div class="form-group">
+                    <label>节点文本</label>
+                    <input type="text" value="${node.text}" 
+                           onchange="updateNodeText('${node.id}', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>层级</label>
+                    <input type="text" value="${node.level}" disabled>
+                </div>
+                <div class="form-group">
+                    <label>位置 X</label>
+                    <input type="number" value="${node.x}" 
+                           onchange="updateNodePosition('${node.id}', 'x', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>位置 Y</label>
+                    <input type="number" value="${node.y}" 
+                           onchange="updateNodePosition('${node.id}', 'y', this.value)">
+                </div>
+            `;
+        }
+
+        function updateNodeText(nodeId, text) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node) {
+                node.text = text;
+                renderNode(node);
+            }
+        }
+
+        function updateNodePosition(nodeId, axis, value) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node) {
+                node[axis] = parseInt(value);
+                renderNode(node);
+                updateConnections();
+            }
+        }
+
+        function editNode(nodeId) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node) {
+                const newText = prompt('输入节点文本:', node.text);
+                if (newText !== null) {
+                    node.text = newText;
+                    renderNode(node);
+                    if (selectedNode && selectedNode.id === nodeId) {
+                        showNodeProperties(node);
+                    }
+                }
+            }
+        }
+
+        function deleteNode(nodeId) {
+            if (nodes.find(n => n.id === nodeId)?.level === 0 && nodes.filter(n => n.level === 0).length === 1) {
+                if (!confirm('删除根节点将同时删除所有子节点，确定吗？')) {
+                    return;
+                }
+            }
+
+            const deleteRecursive = (id) => {
+                const children = nodes.filter(n => n.parentId === id);
+                children.forEach(child => deleteRecursive(child.id));
+                
+                const el = document.getElementById(id);
+                if (el) el.remove();
+                
+                nodes = nodes.filter(n => n.id !== id);
+                connections = connections.filter(c => c.from !== id && c.to !== id);
+            };
+
+            deleteRecursive(nodeId);
+            updateConnections();
+
+            if (selectedNode && selectedNode.id === nodeId) {
+                selectedNode = null;
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+        function startDrag(e, node) {
+            isDragging = true;
+            dragNode = node;
+            selectNode(node);
+            
+            const el = document.getElementById(node.id);
+            const rect = el.getBoundingClientRect();
+            const canvasRect = document.getElementById('mindmapCanvas').getBoundingClientRect();
+            
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+        }
+
+        function handleCanvasMouseDown(e) {
+            if (e.target.id === 'mindmapCanvas' || e.target.id === 'canvasContainer') {
+                document.querySelectorAll('.mindmap-node').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                selectedNode = null;
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging || !dragNode) return;
+
+            const canvasRect = document.getElementById('mindmapCanvas').getBoundingClientRect();
+            const container = document.getElementById('canvasContainer');
+            
+            const x = e.clientX - canvasRect.left - dragOffsetX + container.scrollLeft;
+            const y = e.clientY - canvasRect.top - dragOffsetY + container.scrollTop;
+
+            dragNode.x = Math.max(0, x);
+            dragNode.y = Math.max(0, y);
+            renderNode(dragNode);
+            updateConnections();
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            dragNode = null;
+        }
+
+        function updateConnections() {
+            document.querySelectorAll('.connection-line').forEach(el => el.remove());
+            connections = [];
+
+            nodes.forEach(node => {
+                if (node.parentId) {
+                    const parent = nodes.find(n => n.id === node.parentId);
+                    if (parent) {
+                        drawConnection(parent, node);
+                    }
+                }
+            });
+        }
+
+        function drawConnection(from, to) {
+            const canvas = document.getElementById('mindmapCanvas');
+            
+            const fromEl = document.getElementById(from.id);
+            const toEl = document.getElementById(to.id);
+            
+            if (!fromEl || !toEl) return;
+
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+
+            const x1 = from.x + fromEl.offsetWidth;
+            const y1 = from.y + fromEl.offsetHeight / 2;
+            const x2 = to.x;
+            const y2 = to.y + toEl.offsetHeight / 2;
+
+            const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+            const line = document.createElement('div');
+            line.className = `connection-line level-${to.level}`;
+            line.style.left = x1 + 'px';
+            line.style.top = y1 + 'px';
+            line.style.width = length + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            
+            canvas.appendChild(line);
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function clearCanvas() {
+            if (!confirm('确定要清空画布吗？')) return;
+            
+            nodes = [];
+            connections = [];
+            selectedNode = null;
+            
+            document.getElementById('mindmapCanvas').innerHTML = '';
+            document.getElementById('sidebar').classList.remove('open');
+        }
+
+        function exportMarkdown() {
+            if (nodes.length === 0) {
+                alert('画布为空');
+                return;
+            }
+
+            const rootNodes = nodes.filter(n => n.level === 0);
+            let md = '';
+
+            const buildTree = (node, depth) => {
+                const prefix = '#'.repeat(Math.min(depth + 1, 6));
+                md += `${prefix} ${node.text}\n\n`;
+                
+                const children = nodes.filter(n => n.parentId === node.id);
+                children.forEach(child => buildTree(child, depth + 1));
+            };
+
+            rootNodes.forEach(root => buildTree(root, 0));
+
+            downloadFile(md, 'mindmap.md', 'text/markdown');
+        }
+
+        function exportJSON() {
+            const data = {
+                nodes: nodes,
+                connections: connections
+            };
+            const json = JSON.stringify(data, null, 2);
+            downloadFile(json, 'mindmap.json', 'application/json');
+        }
+
+        function importJSON() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        loadFromData(data);
+                    } catch (err) {
+                        alert('JSON 格式错误');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type: type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFromData(data) {
+            clearCanvas();
+            
+            nodes = data.nodes || [];
+            connections = data.connections || [];
+            
+            nodes.forEach(node => {
+                if (parseInt(node.id.split('_')[1]) >= nodeIdCounter) {
+                    nodeIdCounter = parseInt(node.id.split('_')[1]) + 1;
+                }
+                renderNode(node);
+            });
+            
+            updateConnections();
+        }
+
+        async function loadMeetingModal() {
+            document.getElementById('loadMeetingModal').classList.add('open');
+            
+            try {
+                const response = await fetch('/api/meetings?limit=50');
+                const meetings = await response.json();
+                
+                const container = document.getElementById('meetingListForImport');
+                if (meetings.length === 0) {
+                    container.innerHTML = '<p style="color: #999;">暂无会议记录</p>';
+                    return;
+                }
+                
+                container.innerHTML = meetings.map(m => `
+                    <div class="meeting-list-item" onclick="importMeeting(${m.id})">
+                        <div class="title">${escapeHtml(m.title)}</div>
+                        <div class="meta">${new Date(m.created_at).toLocaleString('zh-CN')} · ${m.status}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                document.getElementById('meetingListForImport').innerHTML = '<p style="color: red;">加载失败</p>';
+            }
+        }
+
+        function closeLoadModal() {
+            document.getElementById('loadMeetingModal').classList.remove('open');
+        }
+
+        async function importMeeting(meetingId) {
+            try {
+                const response = await fetch(`/api/meetings/${meetingId}`);
+                const meeting = await response.json();
+                
+                clearCanvas();
+                
+                const rootId = generateId();
+                const rootNode = {
+                    id: rootId,
+                    text: meeting.title,
+                    x: 500,
+                    y: 300,
+                    level: 0,
+                    parentId: null
+                };
+                nodes.push(rootNode);
+                renderNode(rootNode);
+                
+                let yOffset = -200;
+                
+                if (meeting.summary) {
+                    const summaryId = generateId();
+                    nodes.push({
+                        id: summaryId,
+                        text: '📝 会议摘要',
+                        x: 800,
+                        y: 300 + yOffset,
+                        level: 1,
+                        parentId: rootId
+                    });
+                    
+                    const detailId = generateId();
+                    nodes.push({
+                        id: detailId,
+                        text: meeting.summary.length > 30 ? meeting.summary.substring(0, 30) + '...' : meeting.summary,
+                        x: 1100,
+                        y: 300 + yOffset,
+                        level: 2,
+                        parentId: summaryId
+                    });
+                    
+                    yOffset += 80;
+                }
+                
+                if (meeting.decisions && meeting.decisions.length > 0) {
+                    const decisionsId = generateId();
+                    nodes.push({
+                        id: decisionsId,
+                        text: `✅ 决策 (${meeting.decisions.length})`,
+                        x: 800,
+                        y: 300 + yOffset,
+                        level: 1,
+                        parentId: rootId
+                    });
+                    
+                    meeting.decisions.forEach((decision, i) => {
+                        const dId = generateId();
+                        nodes.push({
+                            id: dId,
+                            text: decision.length > 30 ? decision.substring(0, 30) + '...' : decision,
+                            x: 1100,
+                            y: 300 + yOffset + i * 60,
+                            level: 2,
+                            parentId: decisionsId
+                        });
+                    });
+                    
+                    yOffset += 80 + meeting.decisions.length * 60;
+                }
+                
+                if (meeting.todos && meeting.todos.length > 0) {
+                    const todosId = generateId();
+                    nodes.push({
+                        id: todosId,
+                        text: `📋 待办 (${meeting.todos.length})`,
+                        x: 800,
+                        y: 300 + yOffset,
+                        level: 1,
+                        parentId: rootId
+                    });
+                    
+                    meeting.todos.forEach((todo, i) => {
+                        const task = todo.task || todo.content || '未命名任务';
+                        const tId = generateId();
+                        nodes.push({
+                            id: tId,
+                            text: task.length > 30 ? task.substring(0, 30) + '...' : task,
+                            x: 1100,
+                            y: 300 + yOffset + i * 60,
+                            level: 2,
+                            parentId: todosId
+                        });
+                    });
+                    
+                    yOffset += 80 + meeting.todos.length * 60;
+                }
+                
+                if (meeting.disputes && meeting.disputes.length > 0) {
+                    const disputesId = generateId();
+                    nodes.push({
+                        id: disputesId,
+                        text: `⚖️ 争议点 (${meeting.disputes.length})`,
+                        x: 800,
+                        y: 300 + yOffset,
+                        level: 1,
+                        parentId: rootId
+                    });
+                    
+                    meeting.disputes.forEach((dispute, i) => {
+                        const dId = generateId();
+                        nodes.push({
+                            id: dId,
+                            text: (dispute.issue || '争议点').length > 30 ? (dispute.issue || '争议点').substring(0, 30) + '...' : (dispute.issue || '争议点'),
+                            x: 1100,
+                            y: 300 + yOffset + i * 60,
+                            level: 2,
+                            parentId: disputesId
+                        });
+                    });
+                }
+                
+                nodes.forEach(node => renderNode(node));
+                updateConnections();
+                
+                closeLoadModal();
+                alert('会议数据已导入，可以自由编辑脑图');
+                
+            } catch (err) {
+                alert('导入失败: ' + err.message);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        init();
+    </script>
+</body>
+</html>

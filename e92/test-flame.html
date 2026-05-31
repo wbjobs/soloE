@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日志分析 - 火焰图</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    header { text-align: center; padding: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; margin-bottom: 24px; }
+    header h1 { font-size: 24px; margin-bottom: 8px; }
+    header p { opacity: 0.9; font-size: 14px; }
+    
+    .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 18px; margin-bottom: 16px; color: #333; }
+    
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; }
+    .tab { padding: 12px 20px; border: none; background: none; cursor: pointer; font-size: 14px; color: #718096; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: #667eea; border-bottom-color: #667eea; }
+    
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #f7fafc; padding: 16px; border-radius: 8px; }
+    .stat-label { font-size: 12px; color: #718096; margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 600; color: #2d3748; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f7fafc; font-weight: 600; color: #4a5568; }
+    tr:hover { background: #f7fafc; }
+    
+    .trace-row { cursor: pointer; }
+    .trace-row.selected { background: #e6fffa; }
+    
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .badge-success { background: #c6f6d5; color: #22543d; }
+    .badge-error { background: #fed7d7; color: #742a2a; }
+    .badge-info { background: #bee3f8; color: #2a4365; }
+    
+    .comparison-select { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .comparison-select select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 13px; min-width: 200px; }
+    
+    .diff-positive { color: #e53e3e; }
+    .diff-negative { color: #38a169; }
+    
+    .flamegraph-container { margin-top: 16px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .flamegraph-container .header { margin: 0; padding: 12px; border-radius: 0; background: #f7fafc; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+    .flamegraph-svg-container { overflow-x: auto; }
+    
+    .btn { padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+    .btn-secondary { background: #edf2f7; color: #4a5568; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    
+    .service-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; }
+    .service-user { background: #c6f6d5; color: #22543d; }
+    .service-order { background: #bee3f8; color: #2a4365; }
+    .service-payment { background: #feebc8; color: #744210; }
+    .service-unknown { background: #e2e8f0; color: #4a5568; }
+    
+    .timeline { position: relative; height: 24px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+    .timeline-mark { position: absolute; top: 0; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; border-left: 1px solid #ccc; }
+    .flame-svg { display: block; }
+    .flame-bar { cursor: pointer; transition: opacity 0.2s; }
+    .flame-bar:hover { opacity: 0.8; }
+    .tooltip { position: fixed; background: rgba(0,0,0,0.85); color: white; padding: 10px 12px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 1000; max-width: 300px; }
+    .tooltip .title { font-weight: 600; margin-bottom: 6px; }
+    .tooltip .row { display: flex; justify-content: space-between; gap: 16px; margin: 2px 0; }
+    .tooltip .label { color: #aaa; }
+    .tooltip .value { color: #fff; }
+    .error-badge { background: #F44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+    .legend { display: flex; gap: 16px; margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 4px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .legend-color { width: 16px; height: 16px; border-radius: 2px; }
+    
+    .main-content { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+    @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
+    
+    .trace-list-container { max-height: 600px; overflow-y: auto; }
+    .trace-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+    .trace-item:hover { border-color: #667eea; background: #f0f4ff; }
+    .trace-item.active { border-color: #667eea; background: #e3f2fd; }
+    .trace-info { display: flex; justify-content: space-between; align-items: center; }
+    .trace-id { font-family: monospace; font-size: 12px; }
+    .trace-duration { font-weight: 600; color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 日志分析工具</h1>
+      <p>分布式系统调用链可视化与性能对比</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">📊 概览</button>
+      <button class="tab" data-tab="traces">🔗 调用链</button>
+      <button class="tab" data-tab="compare">⚖️ 对比</button>
+    </div>
+
+    <div id="tab-overview" class="tab-content active">
+      <div class="card">
+        <h2>统计概览</h2>
+        <div id="statsGrid" class="stats-grid"></div>
+        
+        <h3 style="margin-top: 24px; margin-bottom: 12px;">服务统计</h3>
+        <table id="serviceStatsTable">
+          <thead>
+            <tr>
+              <th>服务</th>
+              <th>调用次数</th>
+              <th>总耗时 (ms)</th>
+              <th>平均耗时 (ms)</th>
+              <th>最小 (ms)</th>
+              <th>最大 (ms)</th>
+              <th>错误数</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="tab-traces" class="tab-content">
+      <div class="card">
+        <div class="main-content">
+          <div>
+            <h2>调用链列表</h2>
+            <div id="traceList" class="trace-list-container"></div>
+          </div>
+          <div>
+            <div id="flamegraphContainer" style="display: none;">
+              <div class="header">
+                <strong id="flamegraphTitle">🔥 火焰图</strong>
+                <button class="btn btn-secondary" id="closeFlamegraph">关闭</button>
+              </div>
+              <div class="flamegraph-svg-container">
+                <div id="flame-graph"></div>
+              </div>
+              <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background: #4CAF50"></div>user-srv</div>
+                <div class="legend-item"><div class="legend-color" style="background: #2196F3"></div>order-srv</div>
+                <div class="legend-item"><div class="legend-color" style="background: #FF9800"></div>payment-srv</div>
+                <div class="legend-item"><div class="legend-color" style="background: #F44336"></div>错误</div>
+                <div class="legend-item"><div class="legend-color" style="background: #9E9E9E"></div>未知服务</div>
+              </div>
+            </div>
+            <div id="traceDetailPlaceholder" style="text-align: center; padding: 60px 20px; color: #999;">
+              <div style="font-size: 48px; margin-bottom: 16px;">👈</div>
+              <p>请从左侧选择一条调用链查看火焰图</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-compare" class="tab-content">
+      <div class="card">
+        <h2>调用链对比</h2>
+        <div class="comparison-select">
+          <span>调用链 1:</span>
+          <select id="compareSelect1"></select>
+          <span>调用链 2:</span>
+          <select id="compareSelect2"></select>
+          <button class="btn btn-secondary" id="compareBtn">开始对比</button>
+        </div>
+        
+        <div id="comparisonResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tracesData = [{"traceId":"trace-001","startTime":1716000000000,"endTime":1716000000750,"totalDuration":750,"services":["user-srv","order-srv","payment-srv"],"spanCount":9,"errorCount":0,"spans":[{"spanId":"span-001","parentSpanId":null,"traceId":"trace-001","service":"user-srv","operation":"createOrder","start":1716000000000,"end":1716000000750,"duration":750,"logs":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","timestamp":1716000000000,"level":"info","message":"开始创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000000,"level":"info","message":"开始创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000050,"level":"info","message":"验证用户信息","operation":"validateUser","duration":80,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","operation":"validateUser","timestamp":1716000000050,"level":"info","message":"验证用户信息","duration":80}},{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","operation":"createOrder","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}},{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]},{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}}]},{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000700,"level":"info","message":"发送通知","operation":"sendNotification","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","operation":"sendNotification","timestamp":1716000000700,"level":"info","message":"发送通知","duration":40},"children":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}]}]},{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-002","parentSpanId":"span-001","traceId":"trace-001","service":"user-srv","operation":"validateUser","start":1716000000050,"end":1716000000050,"duration":80,"logs":[{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000050,"level":"info","message":"验证用户信息","operation":"validateUser","duration":80,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","operation":"validateUser","timestamp":1716000000050,"level":"info","message":"验证用户信息","duration":80}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-003","parentSpanId":"span-001","traceId":"trace-001","service":"order-srv","operation":"createOrder","start":1716000000150,"end":1716000000630,"duration":480,"logs":[{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","operation":"createOrder","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}},{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]},{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}}]}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-004","parentSpanId":"span-003","traceId":"trace-001","service":"order-srv","operation":"checkInventory","start":1716000000180,"end":1716000000180,"duration":120,"logs":[{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-005","parentSpanId":"span-003","traceId":"trace-001","service":"payment-srv","operation":"initPayment","start":1716000000320,"end":1716000000360,"duration":40,"logs":[{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-006","parentSpanId":"span-005","traceId":"trace-001","service":"payment-srv","operation":"processPayment","start":1716000000360,"end":1716000000360,"duration":250,"logs":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}],"status":null,"level":"info","kind":"internal","children":[]}]},{"spanId":"span-007","parentSpanId":"span-003","traceId":"trace-001","service":"order-srv","operation":"confirmOrder","start":1716000000630,"end":1716000000630,"duration":60,"logs":[{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}}],"status":null,"level":"info","kind":"internal","children":[]}]},{"spanId":"span-008","parentSpanId":"span-001","traceId":"trace-001","service":"user-srv","operation":"sendNotification","start":1716000000700,"end":1716000000700,"duration":40,"logs":[{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000700,"level":"info","message":"发送通知","operation":"sendNotification","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","operation":"sendNotification","timestamp":1716000000700,"level":"info","message":"发送通知","duration":40},"children":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}]}],"status":null,"level":"info","kind":"internal","children":[]}]}],"logs":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","timestamp":1716000000000,"level":"info","message":"开始创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000000,"level":"info","message":"开始创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000050,"level":"info","message":"验证用户信息","operation":"validateUser","duration":80,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","operation":"validateUser","timestamp":1716000000050,"level":"info","message":"验证用户信息","duration":80}},{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","operation":"createOrder","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}},{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]},{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}}]},{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000700,"level":"info","message":"发送通知","operation":"sendNotification","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","operation":"sendNotification","timestamp":1716000000700,"level":"info","message":"发送通知","duration":40},"children":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}]}]},{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000050,"level":"info","message":"验证用户信息","operation":"validateUser","duration":80,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-002","parentSpanId":"span-001","service":"user-srv","operation":"validateUser","timestamp":1716000000050,"level":"info","message":"验证用户信息","duration":80}},{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-003","parentSpanId":"span-001","service":"order-srv","operation":"createOrder","timestamp":1716000000150,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}},{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]},{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}}]},{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000180,"level":"info","message":"检查库存","operation":"checkInventory","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-004","parentSpanId":"span-003","service":"order-srv","operation":"checkInventory","timestamp":1716000000180,"level":"info","message":"检查库存","duration":120}},{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","timestamp":1716000000320,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-005","parentSpanId":"span-003","service":"payment-srv","operation":"initPayment","timestamp":1716000000320,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}}]},{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","timestamp":1716000000360,"level":"info","message":"处理支付","operation":"processPayment","duration":250,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-006","parentSpanId":"span-005","service":"payment-srv","operation":"processPayment","timestamp":1716000000360,"level":"info","message":"处理支付","duration":250}},{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","timestamp":1716000000630,"level":"info","message":"确认订单","operation":"confirmOrder","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-007","parentSpanId":"span-003","service":"order-srv","operation":"confirmOrder","timestamp":1716000000630,"level":"info","message":"确认订单","duration":60}},{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","timestamp":1716000000700,"level":"info","message":"发送通知","operation":"sendNotification","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-008","parentSpanId":"span-001","service":"user-srv","operation":"sendNotification","timestamp":1716000000700,"level":"info","message":"发送通知","duration":40},"children":[{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}]},{"traceId":"trace-001","spanId":"span-001","parentSpanId":"span-008","service":"user-srv","timestamp":1716000000750,"level":"info","message":"订单创建完成","operation":"createOrder","duration":750,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-001","spanId":"span-001","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000000750,"level":"info","message":"订单创建完成","duration":750}}]},{"traceId":"trace-002","startTime":1716000001000,"endTime":1716000001120,"totalDuration":120,"services":["user-srv"],"spanCount":4,"errorCount":0,"spans":[{"spanId":"span-101","parentSpanId":null,"traceId":"trace-002","service":"user-srv","operation":"getUserInfo","start":1716000001000,"end":1716000001120,"duration":120,"logs":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","timestamp":1716000001000,"level":"info","message":"获取用户信息","operation":"getUserInfo","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001000,"level":"info","message":"获取用户信息","duration":null},"children":[{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001030,"level":"info","message":"查询用户数据","operation":"queryDatabase","duration":45,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","operation":"queryDatabase","timestamp":1716000001030,"level":"info","message":"查询用户数据","duration":45}},{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001090,"level":"info","message":"格式化响应","operation":"formatResponse","duration":20,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","operation":"formatResponse","timestamp":1716000001090,"level":"info","message":"格式化响应","duration":20},"children":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}]}]},{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-102","parentSpanId":"span-101","traceId":"trace-002","service":"user-srv","operation":"queryDatabase","start":1716000001030,"end":1716000001030,"duration":45,"logs":[{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001030,"level":"info","message":"查询用户数据","operation":"queryDatabase","duration":45,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","operation":"queryDatabase","timestamp":1716000001030,"level":"info","message":"查询用户数据","duration":45}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-103","parentSpanId":"span-101","traceId":"trace-002","service":"user-srv","operation":"formatResponse","start":1716000001090,"end":1716000001090,"duration":20,"logs":[{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001090,"level":"info","message":"格式化响应","operation":"formatResponse","duration":20,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","operation":"formatResponse","timestamp":1716000001090,"level":"info","message":"格式化响应","duration":20},"children":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}]}],"status":null,"level":"info","kind":"internal","children":[]}]}],"logs":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","timestamp":1716000001000,"level":"info","message":"获取用户信息","operation":"getUserInfo","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001000,"level":"info","message":"获取用户信息","duration":null},"children":[{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001030,"level":"info","message":"查询用户数据","operation":"queryDatabase","duration":45,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","operation":"queryDatabase","timestamp":1716000001030,"level":"info","message":"查询用户数据","duration":45}},{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001090,"level":"info","message":"格式化响应","operation":"formatResponse","duration":20,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","operation":"formatResponse","timestamp":1716000001090,"level":"info","message":"格式化响应","duration":20},"children":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}]}]},{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001030,"level":"info","message":"查询用户数据","operation":"queryDatabase","duration":45,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-102","parentSpanId":"span-101","service":"user-srv","operation":"queryDatabase","timestamp":1716000001030,"level":"info","message":"查询用户数据","duration":45}},{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","timestamp":1716000001090,"level":"info","message":"格式化响应","operation":"formatResponse","duration":20,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-103","parentSpanId":"span-101","service":"user-srv","operation":"formatResponse","timestamp":1716000001090,"level":"info","message":"格式化响应","duration":20},"children":[{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}]},{"traceId":"trace-002","spanId":"span-101","parentSpanId":"span-103","service":"user-srv","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","operation":"getUserInfo","duration":120,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-002","spanId":"span-101","parentSpanId":null,"service":"user-srv","operation":"getUserInfo","timestamp":1716000001120,"level":"info","message":"获取用户信息完成","duration":120}}]},{"traceId":"trace-003","startTime":1716000002000,"endTime":1716000003840,"totalDuration":1840,"services":["user-srv","order-srv","payment-srv"],"spanCount":9,"errorCount":2,"spans":[{"spanId":"span-201","parentSpanId":null,"traceId":"trace-003","service":"user-srv","operation":"createOrder","start":1716000002000,"end":1716000003840,"duration":1840,"logs":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","timestamp":1716000002000,"level":"info","message":"开始创建订单（慢查询）","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000002000,"level":"info","message":"开始创建订单（慢查询）","duration":null},"children":[{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","timestamp":1716000002100,"level":"info","message":"验证用户信息","operation":"validateUser","duration":200,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","operation":"validateUser","timestamp":1716000002100,"level":"info","message":"验证用户信息","duration":200}},{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","operation":"createOrder","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}},{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]},{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}}]},{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","timestamp":1716000003780,"level":"info","message":"发送失败通知","operation":"sendNotification","duration":50,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","operation":"sendNotification","timestamp":1716000003780,"level":"info","message":"发送失败通知","duration":50},"children":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}]}]},{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}],"status":"error","level":"error","kind":"internal","children":[{"spanId":"span-202","parentSpanId":"span-201","traceId":"trace-003","service":"user-srv","operation":"validateUser","start":1716000002100,"end":1716000002100,"duration":200,"logs":[{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","timestamp":1716000002100,"level":"info","message":"验证用户信息","operation":"validateUser","duration":200,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","operation":"validateUser","timestamp":1716000002100,"level":"info","message":"验证用户信息","duration":200}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-203","parentSpanId":"span-201","traceId":"trace-003","service":"order-srv","operation":"createOrder","start":1716000002350,"end":1716000003670,"duration":1320,"logs":[{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","operation":"createOrder","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}},{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]},{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}}]}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-204","parentSpanId":"span-203","traceId":"trace-003","service":"order-srv","operation":"checkInventory","start":1716000002400,"end":1716000002400,"duration":350,"logs":[{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-205","parentSpanId":"span-203","traceId":"trace-003","service":"payment-srv","operation":"initPayment","start":1716000002780,"end":1716000002850,"duration":70,"logs":[{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-206","parentSpanId":"span-205","traceId":"trace-003","service":"payment-srv","operation":"processPayment","start":1716000002850,"end":1716000002850,"duration":800,"logs":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}],"status":"error","level":"error","kind":"internal","children":[]}]},{"spanId":"span-207","parentSpanId":"span-203","traceId":"trace-003","service":"order-srv","operation":"rollbackOrder","start":1716000003670,"end":1716000003670,"duration":100,"logs":[{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}}],"status":null,"level":"info","kind":"internal","children":[]}]},{"spanId":"span-208","parentSpanId":"span-201","traceId":"trace-003","service":"user-srv","operation":"sendNotification","start":1716000003780,"end":1716000003780,"duration":50,"logs":[{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","timestamp":1716000003780,"level":"info","message":"发送失败通知","operation":"sendNotification","duration":50,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","operation":"sendNotification","timestamp":1716000003780,"level":"info","message":"发送失败通知","duration":50},"children":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}]}],"status":null,"level":"info","kind":"internal","children":[]}]}],"logs":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","timestamp":1716000002000,"level":"info","message":"开始创建订单（慢查询）","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000002000,"level":"info","message":"开始创建订单（慢查询）","duration":null},"children":[{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","timestamp":1716000002100,"level":"info","message":"验证用户信息","operation":"validateUser","duration":200,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","operation":"validateUser","timestamp":1716000002100,"level":"info","message":"验证用户信息","duration":200}},{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","operation":"createOrder","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}},{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]},{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}}]},{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","timestamp":1716000003780,"level":"info","message":"发送失败通知","operation":"sendNotification","duration":50,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","operation":"sendNotification","timestamp":1716000003780,"level":"info","message":"发送失败通知","duration":50},"children":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}]}]},{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","timestamp":1716000002100,"level":"info","message":"验证用户信息","operation":"validateUser","duration":200,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-202","parentSpanId":"span-201","service":"user-srv","operation":"validateUser","timestamp":1716000002100,"level":"info","message":"验证用户信息","duration":200}},{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","operation":"createOrder","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-203","parentSpanId":"span-201","service":"order-srv","operation":"createOrder","timestamp":1716000002350,"level":"info","message":"调用订单服务创建订单","duration":null},"children":[{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}},{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]},{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}}]},{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","timestamp":1716000002400,"level":"info","message":"检查库存","operation":"checkInventory","duration":350,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-204","parentSpanId":"span-203","service":"order-srv","operation":"checkInventory","timestamp":1716000002400,"level":"info","message":"检查库存","duration":350}},{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","timestamp":1716000002780,"level":"info","message":"初始化支付","operation":"initPayment","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-205","parentSpanId":"span-203","service":"payment-srv","operation":"initPayment","timestamp":1716000002780,"level":"info","message":"初始化支付","duration":null},"children":[{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}}]},{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","timestamp":1716000002850,"level":"error","message":"支付处理超时","operation":"processPayment","duration":800,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-206","parentSpanId":"span-205","service":"payment-srv","operation":"processPayment","timestamp":1716000002850,"level":"error","message":"支付处理超时","duration":800}},{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","timestamp":1716000003670,"level":"info","message":"回滚订单","operation":"rollbackOrder","duration":100,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-207","parentSpanId":"span-203","service":"order-srv","operation":"rollbackOrder","timestamp":1716000003670,"level":"info","message":"回滚订单","duration":100}},{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","timestamp":1716000003780,"level":"info","message":"发送失败通知","operation":"sendNotification","duration":50,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-208","parentSpanId":"span-201","service":"user-srv","operation":"sendNotification","timestamp":1716000003780,"level":"info","message":"发送失败通知","duration":50},"children":[{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}]},{"traceId":"trace-003","spanId":"span-201","parentSpanId":"span-208","service":"user-srv","timestamp":1716000003840,"level":"error","message":"订单创建失败","operation":"createOrder","duration":1840,"status":"error","kind":"internal","attributes":{},"raw":{"traceId":"trace-003","spanId":"span-201","parentSpanId":null,"service":"user-srv","operation":"createOrder","timestamp":1716000003840,"level":"error","message":"订单创建失败","duration":1840}}]},{"traceId":"trace-004","startTime":1716000004000,"endTime":1716000004400,"totalDuration":400,"services":["order-srv","user-srv"],"spanCount":5,"errorCount":0,"spans":[{"spanId":"span-301","parentSpanId":null,"traceId":"trace-004","service":"order-srv","operation":"listOrders","start":1716000004000,"end":1716000004400,"duration":400,"logs":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","timestamp":1716000004000,"level":"info","message":"查询订单列表","operation":"listOrders","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004000,"level":"info","message":"查询订单列表","duration":null},"children":[{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004050,"level":"info","message":"查询订单数据","operation":"queryDatabase","duration":180,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","operation":"queryDatabase","timestamp":1716000004050,"level":"info","message":"查询订单数据","duration":180}},{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","operation":"getUserBatch","duration":90,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","operation":"getUserBatch","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","duration":90}},{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004350,"level":"info","message":"合并数据","operation":"mergeData","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","operation":"mergeData","timestamp":1716000004350,"level":"info","message":"合并数据","duration":40},"children":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}]}]},{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-302","parentSpanId":"span-301","traceId":"trace-004","service":"order-srv","operation":"queryDatabase","start":1716000004050,"end":1716000004050,"duration":180,"logs":[{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004050,"level":"info","message":"查询订单数据","operation":"queryDatabase","duration":180,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","operation":"queryDatabase","timestamp":1716000004050,"level":"info","message":"查询订单数据","duration":180}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-303","parentSpanId":"span-301","traceId":"trace-004","service":"user-srv","operation":"getUserBatch","start":1716000004250,"end":1716000004250,"duration":90,"logs":[{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","operation":"getUserBatch","duration":90,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","operation":"getUserBatch","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","duration":90}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-304","parentSpanId":"span-301","traceId":"trace-004","service":"order-srv","operation":"mergeData","start":1716000004350,"end":1716000004350,"duration":40,"logs":[{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004350,"level":"info","message":"合并数据","operation":"mergeData","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","operation":"mergeData","timestamp":1716000004350,"level":"info","message":"合并数据","duration":40},"children":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}]}],"status":null,"level":"info","kind":"internal","children":[]}]}],"logs":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","timestamp":1716000004000,"level":"info","message":"查询订单列表","operation":"listOrders","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004000,"level":"info","message":"查询订单列表","duration":null},"children":[{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004050,"level":"info","message":"查询订单数据","operation":"queryDatabase","duration":180,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","operation":"queryDatabase","timestamp":1716000004050,"level":"info","message":"查询订单数据","duration":180}},{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","operation":"getUserBatch","duration":90,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","operation":"getUserBatch","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","duration":90}},{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004350,"level":"info","message":"合并数据","operation":"mergeData","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","operation":"mergeData","timestamp":1716000004350,"level":"info","message":"合并数据","duration":40},"children":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}]}]},{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004050,"level":"info","message":"查询订单数据","operation":"queryDatabase","duration":180,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-302","parentSpanId":"span-301","service":"order-srv","operation":"queryDatabase","timestamp":1716000004050,"level":"info","message":"查询订单数据","duration":180}},{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","operation":"getUserBatch","duration":90,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-303","parentSpanId":"span-301","service":"user-srv","operation":"getUserBatch","timestamp":1716000004250,"level":"info","message":"批量获取用户信息","duration":90}},{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","timestamp":1716000004350,"level":"info","message":"合并数据","operation":"mergeData","duration":40,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-304","parentSpanId":"span-301","service":"order-srv","operation":"mergeData","timestamp":1716000004350,"level":"info","message":"合并数据","duration":40},"children":[{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}]},{"traceId":"trace-004","spanId":"span-301","parentSpanId":"span-304","service":"order-srv","timestamp":1716000004400,"level":"info","message":"查询完成","operation":"listOrders","duration":400,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-004","spanId":"span-301","parentSpanId":null,"service":"order-srv","operation":"listOrders","timestamp":1716000004400,"level":"info","message":"查询完成","duration":400}}]},{"traceId":"trace-005","startTime":1716000005000,"endTime":1716000005530,"totalDuration":530,"services":["payment-srv","order-srv"],"spanCount":5,"errorCount":0,"spans":[{"spanId":"span-401","parentSpanId":null,"traceId":"trace-005","service":"payment-srv","operation":"refund","start":1716000005000,"end":1716000005530,"duration":530,"logs":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","timestamp":1716000005000,"level":"info","message":"开始退款","operation":"refund","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005000,"level":"info","message":"开始退款","duration":null},"children":[{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005050,"level":"info","message":"验证退款请求","operation":"validateRefund","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","operation":"validateRefund","timestamp":1716000005050,"level":"info","message":"验证退款请求","duration":60}},{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005120,"level":"info","message":"处理退款","operation":"processRefund","duration":320,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","operation":"processRefund","timestamp":1716000005120,"level":"info","message":"处理退款","duration":320}},{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","timestamp":1716000005450,"level":"info","message":"更新订单状态","operation":"updateOrderStatus","duration":70,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","operation":"updateOrderStatus","timestamp":1716000005450,"level":"info","message":"更新订单状态","duration":70},"children":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}]}]},{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}],"status":null,"level":"info","kind":"internal","children":[{"spanId":"span-402","parentSpanId":"span-401","traceId":"trace-005","service":"payment-srv","operation":"validateRefund","start":1716000005050,"end":1716000005050,"duration":60,"logs":[{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005050,"level":"info","message":"验证退款请求","operation":"validateRefund","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","operation":"validateRefund","timestamp":1716000005050,"level":"info","message":"验证退款请求","duration":60}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-403","parentSpanId":"span-401","traceId":"trace-005","service":"payment-srv","operation":"processRefund","start":1716000005120,"end":1716000005120,"duration":320,"logs":[{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005120,"level":"info","message":"处理退款","operation":"processRefund","duration":320,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","operation":"processRefund","timestamp":1716000005120,"level":"info","message":"处理退款","duration":320}}],"status":null,"level":"info","kind":"internal","children":[]},{"spanId":"span-404","parentSpanId":"span-401","traceId":"trace-005","service":"order-srv","operation":"updateOrderStatus","start":1716000005450,"end":1716000005450,"duration":70,"logs":[{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","timestamp":1716000005450,"level":"info","message":"更新订单状态","operation":"updateOrderStatus","duration":70,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","operation":"updateOrderStatus","timestamp":1716000005450,"level":"info","message":"更新订单状态","duration":70},"children":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}]}],"status":null,"level":"info","kind":"internal","children":[]}]}],"logs":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","timestamp":1716000005000,"level":"info","message":"开始退款","operation":"refund","duration":null,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005000,"level":"info","message":"开始退款","duration":null},"children":[{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005050,"level":"info","message":"验证退款请求","operation":"validateRefund","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","operation":"validateRefund","timestamp":1716000005050,"level":"info","message":"验证退款请求","duration":60}},{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005120,"level":"info","message":"处理退款","operation":"processRefund","duration":320,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","operation":"processRefund","timestamp":1716000005120,"level":"info","message":"处理退款","duration":320}},{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","timestamp":1716000005450,"level":"info","message":"更新订单状态","operation":"updateOrderStatus","duration":70,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","operation":"updateOrderStatus","timestamp":1716000005450,"level":"info","message":"更新订单状态","duration":70},"children":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}]}]},{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005050,"level":"info","message":"验证退款请求","operation":"validateRefund","duration":60,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-402","parentSpanId":"span-401","service":"payment-srv","operation":"validateRefund","timestamp":1716000005050,"level":"info","message":"验证退款请求","duration":60}},{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","timestamp":1716000005120,"level":"info","message":"处理退款","operation":"processRefund","duration":320,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-403","parentSpanId":"span-401","service":"payment-srv","operation":"processRefund","timestamp":1716000005120,"level":"info","message":"处理退款","duration":320}},{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","timestamp":1716000005450,"level":"info","message":"更新订单状态","operation":"updateOrderStatus","duration":70,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-404","parentSpanId":"span-401","service":"order-srv","operation":"updateOrderStatus","timestamp":1716000005450,"level":"info","message":"更新订单状态","duration":70},"children":[{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}]},{"traceId":"trace-005","spanId":"span-401","parentSpanId":"span-404","service":"payment-srv","timestamp":1716000005530,"level":"info","message":"退款完成","operation":"refund","duration":530,"status":null,"kind":"internal","attributes":{},"raw":{"traceId":"trace-005","spanId":"span-401","parentSpanId":null,"service":"payment-srv","operation":"refund","timestamp":1716000005530,"level":"info","message":"退款完成","duration":530}}]}];
+    
+    const colorPalette = {"user-srv":"#4CAF50","order-srv":"#2196F3","payment-srv":"#FF9800","unknown":"#9E9E9E","error":"#F44336"};
+    
+    function getServiceColor(service, hasError) {
+      if (hasError) return colorPalette['error'];
+      return colorPalette[service] || colorPalette['unknown'];
+    }
+
+    function formatDuration(ms) {
+      if (ms == null || isNaN(ms)) return '0ms';
+      if (ms < 1) return (ms * 1000).toFixed(0) + 'μs';
+      if (ms < 1000) return ms.toFixed(2) + 'ms';
+      return (ms / 1000).toFixed(2) + 's';
+    }
+
+    function formatTime(ts) {
+      return new Date(ts).toLocaleString();
+    }
+
+    function safeDuration(duration) {
+      if (duration == null || isNaN(duration) || !isFinite(duration) || duration < 0) {
+        return 1;
+      }
+      return Number(duration);
+    }
+
+    function flattenSpans(spans, startTime, depth = 0) {
+      const result = [];
+      for (const span of spans) {
+        const relativeStart = span.start - startTime;
+        const duration = safeDuration(span.duration);
+        result.push({
+          spanId: span.spanId,
+          service: span.service,
+          operation: span.operation,
+          start: Math.max(0, relativeStart),
+          duration,
+          depth,
+          hasError: span.status === 'error' || span.level === 'error',
+          logs: span.logs,
+          children: span.children
+        });
+        if (span.children && span.children.length > 0) {
+          result.push(...flattenSpans(span.children, startTime, depth + 1));
+        }
+      }
+      return result;
+    }
+
+    function generateFlameGraphData(analyzedTrace) {
+      const startTime = analyzedTrace.startTime;
+      const totalDuration = safeDuration(analyzedTrace.totalDuration);
+      const flattened = flattenSpans(analyzedTrace.spans, startTime);
+      const maxDepth = flattened.length > 0 ? Math.max(...flattened.map(s => s.depth), 0) : 0;
+      return {
+        traceId: analyzedTrace.traceId,
+        totalDuration,
+        startTime,
+        endTime: analyzedTrace.endTime,
+        services: analyzedTrace.services,
+        maxDepth,
+        spans: flattened
+      };
+    }
+
+    function renderFlameGraph(data, containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (!data || !data.spans || data.spans.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">没有数据</div>';
+        return;
+      }
+
+      const barHeight = 24;
+      const padding = 10;
+      const minWidth = 1000;
+      const totalDuration = Math.max(1, data.totalDuration);
+      const width = Math.max(minWidth, totalDuration / 2);
+      const height = (data.maxDepth + 1) * barHeight + padding * 2 + 40;
+      const pixelsPerMs = (width - padding * 2) / totalDuration;
+
+      let html = '';
+      html += '<div class="timeline" style="width: ' + width + 'px">';
+      const ticks = 5;
+      for (let i = 0; i <= ticks; i++) {
+        const pos = (i / ticks) * 100;
+        const time = (i / ticks) * totalDuration;
+        html += '<div class="timeline-mark" style="left: ' + pos + '%">' + formatDuration(time) + '</div>';
+      }
+      html += '</div>';
+      
+      html += '<svg class="flame-svg" width="' + width + '" height="' + height + '">';
+
+      for (const span of data.spans) {
+        const duration = Math.max(1, span.duration);
+        const x = padding + span.start * pixelsPerMs;
+        const y = height - padding - (span.depth + 1) * barHeight;
+        const rectWidth = Math.max(duration * pixelsPerMs, 2);
+        const color = getServiceColor(span.service, span.hasError);
+        const label = span.service + ' > ' + span.operation;
+        const displayLabel = rectWidth > 80 ? label.substring(0, Math.floor(rectWidth / 7)) + (rectWidth / 7 < label.length ? '...' : '') : '';
+
+        html += '<g class="flame-bar" data-span='' + encodeURIComponent(JSON.stringify(span)) + ''>';
+        html += '<rect x="' + x + '" y="' + y + '" width="' + rectWidth + '" height="' + (barHeight - 2) + '" fill="' + color + '" rx="2"/>';
+        if (displayLabel) {
+          html += '<text x="' + (x + 6) + '" y="' + (y + barHeight / 2 + 4) + '" fill="white" font-size="11" font-family="monospace">' + displayLabel + '</text>';
+        }
+        html += '</g>';
+      }
+
+      html += '</svg>';
+      container.innerHTML = html;
+
+      const bars = container.querySelectorAll('.flame-bar');
+      let tooltip = document.querySelector('.tooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.style.display = 'none';
+        document.body.appendChild(tooltip);
+      }
+
+      bars.forEach(bar => {
+        bar.addEventListener('mousemove', (e) => {
+          const spanData = JSON.parse(decodeURIComponent(bar.dataset.span));
+          tooltip.style.display = 'block';
+          tooltip.style.left = (e.clientX + 15) + 'px';
+          tooltip.style.top = (e.clientY + 15) + 'px';
+          
+          let logPreview = '';
+          if (spanData.logs && spanData.logs.length > 0) {
+            logPreview = '<div class="row"><span class="label">日志数:</span><span class="value">' + spanData.logs.length + '</span></div>';
+            const lastLog = spanData.logs[spanData.logs.length - 1];
+            if (lastLog.message) {
+              logPreview += '<div style="margin-top:4px; padding-top:4px; border-top:1px solid #444"><strong>最新日志:</strong><br>' + lastLog.message.substring(0, 100) + '</div>';
+            }
+          }
+
+          tooltip.innerHTML = '<div class="title">' + spanData.service + ' > ' + spanData.operation + '</div>' +
+            '<div class="row"><span class="label">耗时:</span><span class="value">' + formatDuration(spanData.duration) + '</span></div>' +
+            '<div class="row"><span class="label">开始偏移:</span><span class="value">' + formatDuration(spanData.start) + '</span></div>' +
+            '<div class="row"><span class="label">层级:</span><span class="value">' + spanData.depth + '</span></div>' +
+            (spanData.hasError ? '<div class="row"><span class="error-badge">ERROR</span></div>' : '') +
+            logPreview;
+        });
+
+        bar.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+      });
+    }
+
+    function renderOverview(traces) {
+      const totalDuration = traces.reduce((sum, t) => sum + safeDuration(t.totalDuration), 0);
+      const avgDuration = traces.length > 0 ? totalDuration / traces.length : 0;
+      const totalErrors = traces.reduce((sum, t) => sum + (t.errorCount || 0), 0);
+      const totalSpans = traces.reduce((sum, t) => sum + (t.spanCount || 0), 0);
+      
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">调用链数量</div>
+          <div class="stat-value">${traces.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">总跨度数</div>
+          <div class="stat-value">${totalSpans}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">平均耗时</div>
+          <div class="stat-value">${formatDuration(avgDuration)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">错误总数</div>
+          <div class="stat-value" style="color: ${totalErrors > 0 ? '#e53e3e' : '#38a169'}">${totalErrors}</div>
+        </div>
+      `;
+      
+      const serviceStats = new Map();
+      for (const trace of traces) {
+        const processSpans = (spans) => {
+          for (const span of spans) {
+            if (!serviceStats.has(span.service)) {
+              serviceStats.set(span.service, {
+                service: span.service,
+                totalCalls: 0,
+                totalDuration: 0,
+                errors: 0,
+                minDuration: Infinity,
+                maxDuration: 0
+              });
+            }
+            const stats = serviceStats.get(span.service);
+            stats.totalCalls++;
+            const duration = safeDuration(span.duration);
+            stats.totalDuration += duration;
+            if (duration < stats.minDuration) stats.minDuration = duration;
+            if (duration > stats.maxDuration) stats.maxDuration = duration;
+            if (span.status === 'error') stats.errors++;
+            if (span.children && span.children.length > 0) {
+              processSpans(span.children);
+            }
+          }
+        };
+        processSpans(trace.spans);
+      }
+
+      const tbody = document.querySelector('#serviceStatsTable tbody');
+      tbody.innerHTML = '';
+      for (const stats of serviceStats.values()) {
+        const avg = stats.totalCalls > 0 ? stats.totalDuration / stats.totalCalls : 0;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${stats.service}</strong></td>
+          <td>${stats.totalCalls}</td>
+          <td>${stats.totalDuration.toFixed(0)}</td>
+          <td>${avg.toFixed(0)}</td>
+          <td>${stats.minDuration === Infinity ? 0 : stats.minDuration.toFixed(0)}</td>
+          <td>${stats.maxDuration.toFixed(0)}</td>
+          <td style="color: ${stats.errors > 0 ? '#e53e3e' : '#38a169'}">${stats.errors}</td>
+        `;
+        tbody.appendChild(row);
+      }
+    }
+
+    function renderTraceList(traces, onSelect) {
+      const container = document.getElementById('traceList');
+      if (!container) return;
+
+      let html = '';
+      const sorted = [...traces].sort((a, b) => safeDuration(b.totalDuration) - safeDuration(a.totalDuration));
+      
+      for (let i = 0; i < sorted.length; i++) {
+        const trace = sorted[i];
+        const hasError = (trace.errorCount || 0) > 0;
+        const isActive = i === 0 ? 'active' : '';
+        
+        const servicesHtml = trace.services.map(s => {
+          const cls = s === 'user-srv' ? 'service-user' : s === 'order-srv' ? 'service-order' : s === 'payment-srv' ? 'service-payment' : 'service-unknown';
+          return `<span class="service-tag ${cls}">${s}</span>`;
+        }).join('');
+        
+        html += `
+          <div class="trace-item ${isActive}" data-trace-id="${trace.traceId}">
+            <div class="trace-info">
+              <span class="trace-id">${trace.traceId.substring(0, 18)}...</span>
+              <span class="trace-duration">${formatDuration(trace.totalDuration)}</span>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-top: 4px;">
+              ${servicesHtml}
+              ${hasError ? `<span class="badge badge-error" style="margin-left: 4px;">${trace.errorCount} 错误</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+      
+      container.innerHTML = html;
+
+      container.querySelectorAll('.trace-item').forEach(item => {
+        item.addEventListener('click', () => {
+          container.querySelectorAll('.trace-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          onSelect(item.dataset.traceId);
+        });
+      });
+    }
+
+    function showTrace(traceId) {
+      const trace = tracesData.find(t => t.traceId === traceId);
+      if (!trace) return;
+      
+      const graphData = generateFlameGraphData(trace);
+      
+      document.getElementById('traceDetailPlaceholder').style.display = 'none';
+      document.getElementById('flamegraphContainer').style.display = 'block';
+      document.getElementById('flamegraphTitle').textContent = `🔥 火焰图 - ${traceId}`;
+      
+      renderFlameGraph(graphData, 'flame-graph');
+    }
+
+    function renderCompareSelects(traces) {
+      const sorted = [...traces].sort((a, b) => safeDuration(b.totalDuration) - safeDuration(a.totalDuration));
+      const select1 = document.getElementById('compareSelect1');
+      const select2 = document.getElementById('compareSelect2');
+      
+      select1.innerHTML = '';
+      select2.innerHTML = '';
+      
+      sorted.forEach((trace, i) => {
+        const opt1 = document.createElement('option');
+        opt1.value = trace.traceId;
+        opt1.textContent = `${trace.traceId} (${formatDuration(trace.totalDuration)})`;
+        select1.appendChild(opt1);
+        
+        const opt2 = document.createElement('option');
+        opt2.value = trace.traceId;
+        opt2.textContent = `${trace.traceId} (${formatDuration(trace.totalDuration)})`;
+        if (i === 1) opt2.selected = true;
+        select2.appendChild(opt2);
+      });
+    }
+
+    function compareTraces(trace1, trace2) {
+      const getFlattenSpans = (spans, prefix = '') => {
+        const result = [];
+        for (const span of spans) {
+          const key = prefix + span.service + ':' + span.operation;
+          result.push({
+            key,
+            service: span.service,
+            operation: span.operation,
+            duration: safeDuration(span.duration)
+          });
+          if (span.children && span.children.length > 0) {
+            result.push(...getFlattenSpans(span.children, key + ' > '));
+          }
+        }
+        return result;
+      };
+
+      const spans1 = getFlattenSpans(trace1.spans);
+      const spans2 = getFlattenSpans(trace2.spans);
+
+      const map1 = new Map(spans1.map(s => [s.key, s]));
+      const map2 = new Map(spans2.map(s => [s.key, s]));
+
+      const allKeys = new Set([...map1.keys(), ...map2.keys()]);
+      const comparison = [];
+
+      for (const key of allKeys) {
+        const s1 = map1.get(key);
+        const s2 = map2.get(key);
+        
+        const d1 = s1 ? s1.duration : 0;
+        const d2 = s2 ? s2.duration : 0;
+        const diff = d2 - d1;
+        const diffPercent = d1 > 0 ? ((diff / d1) * 100) : (d2 > 0 ? 100 : 0);
+
+        comparison.push({
+          key,
+          service: s1?.service || s2?.service,
+          operation: s1?.operation || s2?.operation,
+          duration1: d1,
+          duration2: d2,
+          diff,
+          diffPercent: Number(diffPercent.toFixed(2)),
+          inTrace1: !!s1,
+          inTrace2: !!s2
+        });
+      }
+
+      return {
+        trace1: {
+          traceId: trace1.traceId,
+          totalDuration: safeDuration(trace1.totalDuration),
+          spanCount: trace1.spanCount
+        },
+        trace2: {
+          traceId: trace2.traceId,
+          totalDuration: safeDuration(trace2.totalDuration),
+          spanCount: trace2.spanCount
+        },
+        totalDiff: safeDuration(trace2.totalDuration) - safeDuration(trace1.totalDuration),
+        totalDiffPercent: trace1.totalDuration > 0 
+          ? (((safeDuration(trace2.totalDuration) - safeDuration(trace1.totalDuration)) / safeDuration(trace1.totalDuration)) * 100).toFixed(2)
+          : '0',
+        details: comparison.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      };
+    }
+
+    function renderComparison(comparison) {
+      const container = document.getElementById('comparisonResult');
+      
+      const totalDiffClass = comparison.totalDiff > 0 ? 'diff-positive' : 'diff-negative';
+      
+      let html = `
+        <div style="padding: 16px; background: #f7fafc; border-radius: 8px; margin-bottom: 16px;">
+          <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+            <div><strong>Trace 1:</strong> ${comparison.trace1.traceId} (${formatDuration(comparison.trace1.totalDuration)})</div>
+            <div style="font-size: 20px;">→</div>
+            <div><strong>Trace 2:</strong> ${comparison.trace2.traceId} (${formatDuration(comparison.trace2.totalDuration)})</div>
+            <div style="margin-left: auto;"><strong>总差异:</strong> <span class="${totalDiffClass}">${comparison.totalDiff > 0 ? '+' : ''}${formatDuration(comparison.totalDiff)} (${comparison.totalDiff > 0 ? '+' : ''}${comparison.totalDiffPercent}%)</span></div>
+          </div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>路径</th>
+              <th>Trace 1 (ms)</th>
+              <th>Trace 2 (ms)</th>
+              <th>差异 (ms)</th>
+              <th>差异 (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      comparison.details.forEach(d => {
+        const diffClass = d.diff > 0 ? 'diff-positive' : 'diff-negative';
+        html += `
+          <tr>
+            <td style="font-family: monospace; font-size: 12px;">${d.key}</td>
+            <td>${d.inTrace1 ? d.duration1.toFixed(2) : '-'}</td>
+            <td>${d.inTrace2 ? d.duration2.toFixed(2) : '-'}</td>
+            <td class="${diffClass}">${d.diff > 0 ? '+' : ''}${d.diff.toFixed(2)}</td>
+            <td class="${diffClass}">${d.diffPercent > 0 ? '+' : ''}${d.diffPercent}%</td>
+          </tr>
+        `;
+      });
+      
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function init() {
+      if (tracesData.length === 0) {
+        document.querySelector('.container').innerHTML = '<div class="card" style="text-align: center; padding: 60px;"><div style="font-size: 48px; margin-bottom: 16px;">📭</div><p>没有找到调用链数据</p></div>';
+        return;
+      }
+
+      renderOverview(tracesData);
+      renderTraceList(tracesData, showTrace);
+      renderCompareSelects(tracesData);
+
+      const sorted = [...tracesData].sort((a, b) => safeDuration(b.totalDuration) - safeDuration(a.totalDuration));
+      if (sorted.length > 0) {
+        showTrace(sorted[0].traceId);
+      }
+
+      document.getElementById('closeFlamegraph').addEventListener('click', () => {
+        document.getElementById('flamegraphContainer').style.display = 'none';
+        document.getElementById('traceDetailPlaceholder').style.display = 'block';
+        document.querySelectorAll('.trace-item').forEach(i => i.classList.remove('active'));
+      });
+
+      document.getElementById('compareBtn').addEventListener('click', () => {
+        const trace1 = tracesData.find(t => t.traceId === document.getElementById('compareSelect1').value);
+        const trace2 = tracesData.find(t => t.traceId === document.getElementById('compareSelect2').value);
+        if (trace1 && trace2 && trace1.traceId !== trace2.traceId) {
+          const comparison = compareTraces(trace1, trace2);
+          renderComparison(comparison);
+        } else if (trace1 && trace2 && trace1.traceId === trace2.traceId) {
+          alert('请选择不同的调用链进行对比');
+        }
+      });
+
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        });
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

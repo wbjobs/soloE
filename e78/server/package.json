@@ -1,0 +1,17 @@
+{
+  "name": "3d-model-diff-server",
+  "version": "1.0.0",
+  "description": "3D模型差异比较后端服务",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5",
+    "three": "^0.159.0",
+    "ws": "^8.14.2"
+  }
+}

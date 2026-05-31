@@ -1,0 +1,29 @@
+{
+  "name": "webrtc-screen-share",
+  "version": "1.0.0",
+  "description": "WebRTC Screen Sharing with Whiteboard",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "nodemon --exec electron .",
+    "server": "node server/signaling-server.js",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "socket.io-client": "^4.6.0",
+    "simple-peer": "^9.11.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.9.1",
+    "nodemon": "^3.0.0",
+    "socket.io": "^4.6.0"
+  },
+  "build": {
+    "appId": "com.example.webrtc-screen-share",
+    "productName": "WebRTC Screen Share",
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

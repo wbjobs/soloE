@@ -1,0 +1,30 @@
+@startuml
+' 调用链时序图 - trace-003
+skinparam sequence {
+    ArrowColor #333333
+    ActorBorderColor #333333
+    BoxBorderColor #333333
+    LifeLineBorderColor #333333
+    ParticipantBorderColor #333333
+    BoxFontName Arial
+    ParticipantFontName Arial
+}
+
+title 调用链时序图
+Trace ID: trace-003
+总耗时: 1840ms
+
+participant "user-srv" as user_srv #LightSkyBlue
+participant "order-srv" as order_srv #LightGreen
+participant "payment-srv" as payment_srv #LightGoldenRodYellow
+
+' 调用流程
+activate user_srv
+note over user_srv : 1840ms | ERROR
+deactivate user_srv
+note right of user_srv #FFE4E1: createOrder - 发生错误
+user_srv ->[#FF6B6B] order_srv : 1320ms
+note right of order_srv #FFF0F0: createOrder - 耗时较长 (1320ms)
+order_srv -> payment_srv : 70ms
+note right of payment_srv #FFE4E1: processPayment - 发生错误
+@enduml

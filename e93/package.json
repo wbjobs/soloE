@@ -1,0 +1,17 @@
+{
+  "name": "offline-route-planner",
+  "version": "1.0.0",
+  "description": "Offline route planning service with OSM PBF data",
+  "private": true,
+  "scripts": {
+    "build:rust": "cd rust-ext && cargo build --release",
+    "install:rust": "cd rust-ext && npm run build",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "install:all": "npm install && cd rust-ext && npm install && cd ../backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

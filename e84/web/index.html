@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Load Tester - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            opacity: 0.9;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s;
+        }
+
+        .status-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .status-card h3 {
+            font-size: 0.9rem;
+            color: #8892b0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-card .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #64ffda;
+        }
+
+        .status-card.warning .value {
+            color: #ff6b6b;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .chart-container h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #ccd6f6;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-panel {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .control-panel h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #ccd6f6;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8892b0;
+        }
+
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            background: #0f3460;
+            border: 1px solid #1a1a2e;
+            border-radius: 5px;
+            color: #eee;
+            font-size: 1rem;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(86, 171, 47, 0.4);
+        }
+
+        .failure-panel {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%);
+            border: 1px solid #ff6b6b;
+        }
+
+        .failure-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .failure-status.normal {
+            background: rgba(86, 171, 47, 0.2);
+            color: #56ab2f;
+        }
+
+        .failure-status.active {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .failure-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .failure-stat {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .failure-stat .label {
+            font-size: 0.8rem;
+            color: #8892b0;
+        }
+
+        .failure-stat .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #64ffda;
+        }
+
+        .events-log {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .events-log h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #ccd6f6;
+        }
+
+        .event-item {
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            margin-bottom: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .event-item.failure {
+            border-left-color: #ff6b6b;
+        }
+
+        .event-item.recovery {
+            border-left-color: #56ab2f;
+        }
+
+        .event-time {
+            font-size: 0.8rem;
+            color: #8892b0;
+        }
+
+        .event-message {
+            margin-top: 5px;
+            color: #eee;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MQTT Load Tester Dashboard</h1>
+            <p>实时监控 MQTT 负载测试性能</p>
+        </header>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>客户端数量</h3>
+                <div class="value" id="clientCount">0</div>
+            </div>
+            <div class="status-card">
+                <h3>发布速率 (msg/s)</h3>
+                <div class="value" id="publishRate">0</div>
+            </div>
+            <div class="status-card">
+                <h3>总发布消息</h3>
+                <div class="value" id="totalPublished">0</div>
+            </div>
+            <div class="status-card">
+                <h3>总接收消息</h3>
+                <div class="value" id="totalReceived">0</div>
+            </div>
+            <div class="status-card warning">
+                <h3>消息丢失</h3>
+                <div class="value" id="totalLost">0</div>
+            </div>
+            <div class="status-card warning">
+                <h3>乱序消息</h3>
+                <div class="value" id="outOfOrder">0</div>
+            </div>
+            <div class="status-card">
+                <h3>平均延迟 (ms)</h3>
+                <div class="value" id="avgLatency">0.00</div>
+            </div>
+            <div class="status-card">
+                <h3>吞吐量 (msg/s)</h3>
+                <div class="value" id="throughput">0.00</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>延迟趋势图</h2>
+                <div class="chart-wrapper">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h2>吞吐量趋势图</h2>
+                <div class="chart-wrapper">
+                    <canvas id="throughputChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-panel">
+                <h2>负载控制</h2>
+                <div class="control-group">
+                    <label>调整客户端数量</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="clientCountInput" value="5" min="1">
+                        <button class="btn btn-success" onclick="addClients()">增加客户端</button>
+                        <button class="btn btn-danger" onclick="removeClients()">减少客户端</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>调整发布速率 (msg/s)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="publishRateInput" value="10" min="1">
+                        <button class="btn btn-primary" onclick="setPublishRate()">设置速率</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-panel failure-panel">
+                <h2>故障注入</h2>
+                <div class="failure-status normal" id="failureStatus">
+                    状态：正常运行
+                </div>
+                <button class="btn btn-danger" id="injectFailureBtn" onclick="injectFailure()">
+                    注入 Broker 故障
+                </button>
+                <div class="failure-stats">
+                    <div class="failure-stat">
+                        <div class="label">总故障次数</div>
+                        <div class="value" id="totalFailures">0</div>
+                    </div>
+                    <div class="failure-stat">
+                        <div class="label">总停机时间</div>
+                        <div class="value" id="totalDowntime">0s</div>
+                    </div>
+                    <div class="failure-stat">
+                        <div class="label">重复消息</div>
+                        <div class="value" id="dupMessages">0</div>
+                    </div>
+                    <div class="failure-stat">
+                        <div class="label">未确认消息</div>
+                        <div class="value" id="unconfirmedMessages">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="events-log">
+            <h2>事件日志</h2>
+            <div id="eventsList">
+                <div class="event-item">
+                    <div class="event-time">系统启动中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        const MAX_DATA_POINTS = 100;
+
+        let latencyChart, throughputChart;
+        let latencyData = [];
+        let throughputData = [];
+        let labels = [];
+
+        function initCharts() {
+            const latencyCtx = document.getElementById('latencyChart').getContext('2d');
+            const throughputCtx = document.getElementById('throughputChart').getContext('2d');
+
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#8892b0', maxTicksLimit: 8 }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#8892b0' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#ccd6f6' }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            };
+
+            latencyChart = new Chart(latencyCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '平均延迟 (ms)',
+                            data: latencyData,
+                            borderColor: '#64ffda',
+                            backgroundColor: 'rgba(100, 255, 218, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: '最大延迟 (ms)',
+                            data: [],
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: chartOptions
+            });
+
+            throughputChart = new Chart(throughputCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '吞吐量 (msg/s)',
+                        data: throughputData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+
+                document.getElementById('clientCount').textContent = data.client_count;
+                document.getElementById('publishRate').textContent = data.publish_rate;
+                document.getElementById('totalPublished').textContent = data.total_published.toLocaleString();
+                document.getElementById('totalReceived').textContent = data.total_received.toLocaleString();
+                document.getElementById('totalLost').textContent = data.total_lost.toLocaleString();
+                document.getElementById('outOfOrder').textContent = data.out_of_order.toLocaleString();
+                document.getElementById('avgLatency').textContent = data.avg_latency_ms.toFixed(2);
+                document.getElementById('throughput').textContent = data.throughput_msg_sec.toFixed(2);
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+            }
+        }
+
+        async function fetchTimeSeries() {
+            try {
+                const response = await fetch(`${API_BASE}/timeseries?n=${MAX_DATA_POINTS}`);
+                const data = await response.json();
+
+                if (data.length > 0) {
+                    labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+                    latencyData = data.map(d => d.avg_latency_ms);
+                    const maxLatencyData = data.map(d => d.max_latency_ms);
+                    throughputData = data.map(d => d.throughput);
+
+                    latencyChart.data.labels = labels;
+                    latencyChart.data.datasets[0].data = latencyData;
+                    latencyChart.data.datasets[1].data = maxLatencyData;
+                    latencyChart.update('none');
+
+                    throughputChart.data.labels = labels;
+                    throughputChart.data.datasets[0].data = throughputData;
+                    throughputChart.update('none');
+                }
+            } catch (error) {
+                console.error('Failed to fetch time series:', error);
+            }
+        }
+
+        async function fetchFailureStats() {
+            try {
+                const response = await fetch(`${API_BASE}/failure`);
+                const data = await response.json();
+
+                document.getElementById('totalFailures').textContent = data.total_failures;
+                document.getElementById('totalDowntime').textContent = data.total_downtime_seconds.toFixed(2) + 's';
+                document.getElementById('dupMessages').textContent = data.duplicate_messages.toLocaleString();
+                document.getElementById('unconfirmedMessages').textContent = data.unconfirmed_messages.toLocaleString();
+
+                const statusEl = document.getElementById('failureStatus');
+                const btnEl = document.getElementById('injectFailureBtn');
+
+                if (data.is_in_failure) {
+                    statusEl.className = 'failure-status active';
+                    statusEl.textContent = '状态：故障恢复中...';
+                    btnEl.disabled = true;
+                    btnEl.style.opacity = '0.5';
+                } else {
+                    statusEl.className = 'failure-status normal';
+                    statusEl.textContent = '状态：正常运行';
+                    btnEl.disabled = false;
+                    btnEl.style.opacity = '1';
+                }
+            } catch (error) {
+                console.error('Failed to fetch failure stats:', error);
+            }
+        }
+
+        async function addClients() {
+            const count = parseInt(document.getElementById('clientCountInput').value);
+            if (count <= 0) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/clients/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count })
+                });
+                const data = await response.json();
+                addEvent('success', data.message);
+            } catch (error) {
+                addEvent('error', '增加客户端失败: ' + error.message);
+            }
+        }
+
+        async function removeClients() {
+            const count = parseInt(document.getElementById('clientCountInput').value);
+            if (count <= 0) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/clients/remove`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count })
+                });
+                const data = await response.json();
+                addEvent('success', data.message);
+            } catch (error) {
+                addEvent('error', '减少客户端失败: ' + error.message);
+            }
+        }
+
+        async function setPublishRate() {
+            const rate = parseInt(document.getElementById('publishRateInput').value);
+            if (rate <= 0) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/publish-rate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rate })
+                });
+                const data = await response.json();
+                addEvent('success', data.message);
+            } catch (error) {
+                addEvent('error', '设置发布速率失败: ' + error.message);
+            }
+        }
+
+        async function injectFailure() {
+            if (!confirm('确定要注入 Broker 故障吗？这将断开所有客户端连接并自动重连。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/failure/inject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                addEvent('failure', '故障已注入：' + data.message);
+            } catch (error) {
+                addEvent('error', '注入故障失败: ' + error.message);
+            }
+        }
+
+        function addEvent(type, message) {
+            const eventsList = document.getElementById('eventsList');
+            const eventItem = document.createElement('div');
+            eventItem.className = `event-item ${type}`;
+            eventItem.innerHTML = `
+                <div class="event-time">${new Date().toLocaleString()}</div>
+                <div class="event-message">${message}</div>
+            `;
+            eventsList.insertBefore(eventItem, eventsList.firstChild);
+
+            while (eventsList.children.length > 50) {
+                eventsList.removeChild(eventsList.lastChild);
+            }
+        }
+
+        function init() {
+            initCharts();
+            addEvent('success', 'Dashboard 已连接，开始监控...');
+
+            fetchStatus();
+            fetchTimeSeries();
+            fetchFailureStats();
+
+            setInterval(fetchStatus, 2000);
+            setInterval(fetchTimeSeries, 5000);
+            setInterval(fetchFailureStats, 3000);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

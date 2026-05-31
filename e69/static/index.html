@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASI Scheduler - 分布式调度系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 WASI Scheduler</h1>
+            <p class="subtitle">分布式WASI模块调度与DAG工作流系统</p>
+            <div class="status-bar">
+                <span id="connectionStatus" class="status-indicator connected">● 已连接</span>
+                <span id="lastUpdate">最后更新: --</span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">📊 仪表盘</button>
+            <button class="tab-btn" data-tab="cluster">🖥️ 集群管理</button>
+            <button class="tab-btn" data-tab="workflows">⚙️ 工作流</button>
+            <button class="tab-btn" data-tab="modules">📦 模块</button>
+            <button class="tab-btn" data-tab="metrics">📈 指标</button>
+        </nav>
+
+        <main>
+            <section id="dashboard" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🖥️</div>
+                        <div class="stat-info">
+                            <h3>工作节点</h3>
+                            <p class="stat-value" id="totalWorkers">0</p>
+                            <p class="stat-label">在线: <span id="onlineWorkers">0</span></p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚙️</div>
+                        <div class="stat-info">
+                            <h3>运行中任务</h3>
+                            <p class="stat-value" id="runningTasks">0</p>
+                            <p class="stat-label">总执行: <span id="totalExecutions">0</span></p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🧩</div>
+                        <div class="stat-info">
+                            <h3>工作流</h3>
+                            <p class="stat-value" id="totalWorkflows">0</p>
+                            <p class="stat-label">队列长度: <span id="queueLength">0</span></p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-info">
+                            <h3>内存使用</h3>
+                            <p class="stat-value" id="usedMemory">0</p>
+                            <p class="stat-label">总计: <span id="totalMemory">0</span> MB</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>实时状态</h3>
+                    <div class="chart-placeholder">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="cluster" class="tab-content">
+                <div class="section-header">
+                    <h2>集群管理</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>节点名称</th>
+                                <th>状态</th>
+                                <th>CPU核心</th>
+                                <th>可用内存</th>
+                                <th>运行任务</th>
+                                <th>最后心跳</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workersTable">
+                            <tr>
+                                <td colspan="6" class="loading">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="workflows" class="tab-content">
+                <div class="section-header">
+                    <h2>工作流管理</h2>
+                    <button id="createWorkflowBtn" class="btn btn-primary">+ 创建工作流</button>
+                </div>
+                <div class="workflows-grid" id="workflowsGrid">
+                    <div class="loading">加载中...</div>
+                </div>
+            </section>
+
+            <section id="modules" class="tab-content">
+                <div class="section-header">
+                    <h2>模块管理</h2>
+                    <button id="createModuleBtn" class="btn btn-primary">+ 加载模块</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>模块名称</th>
+                                <th>ID</th>
+                                <th>优先级</th>
+                                <th>加载时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modulesTable">
+                            <tr>
+                                <td colspan="5" class="loading">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="metrics" class="tab-content">
+                <div class="section-header">
+                    <h2>调度指标</h2>
+                </div>
+                <div class="metrics-container">
+                    <div class="metrics-card">
+                        <h3>执行指标</h3>
+                        <div class="metric-item">
+                            <span class="metric-label">总执行次数</span>
+                            <span class="metric-value" id="metricTotal">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">成功执行</span>
+                            <span class="metric-value success" id="metricSuccess">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">失败执行</span>
+                            <span class="metric-value error" id="metricFailed">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">平均执行时间</span>
+                            <span class="metric-value" id="metricAvgTime">0 ms</span>
+                        </div>
+                    </div>
+                    <div class="metrics-card">
+                        <h3>队列指标</h3>
+                        <div class="metric-item">
+                            <span class="metric-label">当前队列长度</span>
+                            <span class="metric-value" id="metricQueueLen">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">峰值队列长度</span>
+                            <span class="metric-value" id="metricPeakLen">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">总入队次数</span>
+                            <span class="metric-value" id="metricEnqueued">0</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">总出队次数</span>
+                            <span class="metric-value" id="metricDequeued">0</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="workflowModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>创建工作流</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="workflowForm">
+                    <div class="form-group">
+                        <label>工作流名称</label>
+                        <input type="text" id="workflowName" required placeholder="输入工作流名称">
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="workflowDesc" rows="3" placeholder="工作流描述"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">创建</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加任务</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="taskForm">
+                    <input type="hidden" id="taskWorkflowId">
+                    <div class="form-group">
+                        <label>任务名称</label>
+                        <input type="text" id="taskName" required placeholder="输入任务名称">
+                    </div>
+                    <div class="form-group">
+                        <label>模块</label>
+                        <select id="taskModuleId" required>
+                            <option value="">选择模块</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>依赖任务 (逗号分隔)</label>
+                        <input type="text" id="taskDepends" placeholder="例如: task-id-1,task-id-2">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">添加任务</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="moduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>加载WASI模块</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="moduleForm">
+                    <div class="form-group">
+                        <label>模块名称</label>
+                        <input type="text" id="moduleName" required placeholder="输入模块名称">
+                    </div>
+                    <div class="form-group">
+                        <label>模块路径</label>
+                        <input type="text" id="modulePath" required placeholder="/path/to/module.wasm">
+                    </div>
+                    <div class="form-group">
+                        <label>优先级</label>
+                        <select id="modulePriority">
+                            <option value="0">低</option>
+                            <option value="1" selected>普通</option>
+                            <option value="2">高</option>
+                            <option value="3">关键</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">加载模块</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

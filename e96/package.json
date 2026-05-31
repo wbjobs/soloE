@@ -1,0 +1,36 @@
+{
+  "name": "data-migration-tool",
+  "version": "1.0.0",
+  "description": "MySQL to PostgreSQL data migration with validation and real-time monitoring",
+  "main": "dist/index.js",
+  "bin": {
+    "migrate": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli/index.ts",
+    "server": "ts-node src/server/index.ts",
+    "web": "cd web && npm start",
+    "start": "concurrently \"npm run server\" \"npm run web\""
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "mysql2": "^3.9.2",
+    "pg": "^8.11.3",
+    "socket.io": "^4.7.4",
+    "p-limit": "^3.1.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.28",
+    "@types/pg": "^8.11.2",
+    "@types/fs-extra": "^11.0.4",
+    "concurrently": "^8.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.2"
+  }
+}

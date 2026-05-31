@@ -1,0 +1,43 @@
+broker:
+  host: localhost
+  port: 1883
+  protocol: tcp
+  username: ""
+  password: ""
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+    insecure_skip_verify: false
+
+clients:
+  count: 10
+  connect_timeout: 10s
+  keep_alive: 60s
+  client_id_prefix: "load-tester"
+  max_concurrent_connects: 50
+  connect_delay: 100ms
+  memory_monitor_interval: 30s
+
+topics:
+  base_topic: "test/load"
+  share_group: "load-test-group"
+  use_share_sub: true
+  qos: 1
+
+testing:
+  duration: 60s
+  message_size: 100
+  publish_rate: 10
+  warmup_period: 5s
+
+http_server:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+
+output:
+  csv_file: "mqtt_load_test_report.csv"
+  interval: 5s
+  console_print: true

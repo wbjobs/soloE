@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会议录音分析工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>🎙️ 会议录音分析工具</h1>
+            <div class="header-actions">
+                <a href="realtime.html" class="btn btn-secondary">
+                    🎤 实时转写
+                </a>
+                <a href="mindmap-editor.html" class="btn btn-secondary">
+                    🧠 脑图编辑
+                </a>
+                <button id="refreshBtn" class="btn btn-secondary">
+                    🔄 刷新
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="upload-section">
+                    <h2>上传会议录音</h2>
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept=".m4a" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">📁</div>
+                            <p>点击或拖拽 .m4a 文件到此处</p>
+                            <p class="upload-hint">仅支持 .m4a 格式</p>
+                        </div>
+                    </div>
+                    <div class="upload-options">
+                        <div class="form-group">
+                            <label for="meetingTitle">会议标题</label>
+                            <input type="text" id="meetingTitle" placeholder="可选，默认使用文件名">
+                        </div>
+                        <div class="form-group">
+                            <label for="numSpeakers">发言人数</label>
+                            <select id="numSpeakers">
+                                <option value="">自动检测</option>
+                                <option value="1">1 人</option>
+                                <option value="2">2 人</option>
+                                <option value="3">3 人</option>
+                                <option value="4">4 人</option>
+                                <option value="5">5 人</option>
+                                <option value="6">6 人</option>
+                                <option value="7">7 人</option>
+                                <option value="8">8 人</option>
+                            </select>
+                        </div>
+                        <button id="uploadBtn" class="btn btn-primary" disabled>
+                            开始分析
+                        </button>
+                    </div>
+                    <div id="uploadProgress" class="upload-progress hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="progressText">正在上传...</p>
+                    </div>
+                </div>
+
+                <div class="search-section">
+                    <h2>搜索会议</h2>
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="搜索标题、内容...">
+                        <button id="searchBtn" class="btn btn-primary">🔍</button>
+                    </div>
+                </div>
+
+                <div class="meetings-list-section">
+                    <h2>历史会议</h2>
+                    <div class="meetings-list" id="meetingsList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="content">
+                <div id="detailView" class="detail-view hidden">
+                    <div class="detail-header">
+                        <h2 id="detailTitle">会议详情</h2>
+                        <div class="detail-actions">
+                            <button id="generateEmailBtn" class="btn btn-primary">
+                                ✉️ 生成邮件
+                            </button>
+                            <button id="downloadXmindBtn" class="btn btn-primary">
+                                📥 下载 XMind
+                            </button>
+                            <button id="deleteBtn" class="btn btn-danger">
+                                🗑️ 删除
+                            </button>
+                            <button id="closeDetailBtn" class="btn btn-secondary">
+                                ✕ 关闭
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="detail-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">状态:</span>
+                            <span id="detailStatus" class="status-badge">处理中</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">时长:</span>
+                            <span id="detailDuration">-</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">创建时间:</span>
+                            <span id="detailCreatedAt">-</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-sections">
+                        <div class="section">
+                            <h3>📝 会议摘要</h3>
+                            <div id="detailSummary" class="section-content">
+                                <p class="empty">暂无摘要</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h3>✅ 决策</h3>
+                            <div id="detailDecisions" class="section-content">
+                                <p class="empty">暂无决策</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h3>📋 待办事项</h3>
+                            <div id="detailTodos" class="section-content">
+                                <p class="empty">暂无待办事项</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h3>⚖️ 争议点</h3>
+                            <div id="detailDisputes" class="section-content">
+                                <p class="empty">暂无争议点</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h3>💬 完整转录</h3>
+                            <div id="detailTranscription" class="section-content transcription">
+                                <p class="empty">暂无转录内容</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="welcomeView" class="welcome-view">
+                    <div class="welcome-content">
+                        <div class="welcome-icon">🎙️</div>
+                        <h2>欢迎使用会议录音分析工具</h2>
+                        <p>上传 .m4a 格式的会议录音，自动完成：</p>
+                        <ul class="feature-list">
+                            <li>🎤 语音转录（Whisper medium 模型）</li>
+                            <li>👥 多发言人识别（声纹聚类）</li>
+                            <li>🤖 智能分析（决策、待办、争议点）</li>
+                            <li>🧠 生成 XMind 脑图</li>
+                        </ul>
+                        <p class="hint">从左侧上传文件开始，或选择历史会议查看详情</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden">
+        <span id="toastMessage"></span>
+    </div>
+
+    <div id="emailModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px; width: 90%; max-height: 85vh;">
+            <div class="modal-header">
+                <h2>✉️ 会议总结邮件</h2>
+                <button class="close-btn" onclick="closeEmailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>邮件模板</label>
+                    <select id="emailTemplate">
+                        <option value="formal">正式模板</option>
+                        <option value="simple">简洁模板</option>
+                        <option value="detailed">详细模板</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>邮件主题</label>
+                    <input type="text" id="emailSubject" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>邮件正文</label>
+                    <textarea id="emailBody" style="width: 100%; min-height: 300px; font-family: monospace;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeEmailModal()">关闭</button>
+                <button class="btn btn-secondary" onclick="regenerateEmail()">重新生成</button>
+                <button class="btn btn-primary" onclick="copyEmailBody()">📋 复制正文</button>
+                <button class="btn btn-primary" onclick="copyFullEmail()">📋 复制全部</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

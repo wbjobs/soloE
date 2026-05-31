@@ -1,0 +1,10 @@
+source,target,transformation,is_direct,source_type,target_type
+table:orders,column:orders.order_id,contains,True,table,source_column
+table:orders,column:orders.customer_id,contains,True,table,source_column
+table:orders,column:orders.product_id,contains,True,table,source_column
+table:orders,column:orders.quantity,contains,True,table,source_column
+table:orders,column:orders.unit_price,contains,True,table,source_column
+table:orders,column:orders.order_date,contains,True,table,source_column
+table:orders,column:orders.status,contains,True,table,source_column
+column:orders.customer_id,output:customer_id,direct,True,source_column,output_column
+column:orders.quantity,output:total_qty,function(SUM),False,source_column,output_column

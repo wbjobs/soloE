@@ -1,0 +1,29 @@
+{
+  "name": "3d-model-diff-tool",
+  "version": "1.0.0",
+  "description": "3D模型差异比较工具 - 基于ICP配准的顶点差异分析",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "cli": "node cli/diff-cli.js"
+  },
+  "keywords": [
+    "3d",
+    "model",
+    "diff",
+    "icp",
+    "threejs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "axios": "^1.16.1",
+    "concurrently": "^8.2.2",
+    "form-data": "^4.0.5",
+    "nodemon": "^3.0.1"
+  }
+}

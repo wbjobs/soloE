@@ -1,0 +1,6 @@
+/target
+/certs
+*.log
+Cargo.lock.bak
+.vscode/
+.idea/

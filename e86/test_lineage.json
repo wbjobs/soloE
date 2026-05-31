@@ -1,0 +1,419 @@
+{
+  "nodes": [
+    {
+      "id": "table:orders",
+      "label": "orders",
+      "type": "table",
+      "metadata": {
+        "row_count": 10,
+        "file_count": 1,
+        "is_partitioned": false,
+        "partition_columns": []
+      }
+    },
+    {
+      "id": "column:orders.order_id",
+      "label": "order_id",
+      "type": "source_column",
+      "metadata": {
+        "type": "int64",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": 1,
+          "max_value": 10,
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.customer_id",
+      "label": "customer_id",
+      "type": "source_column",
+      "metadata": {
+        "type": "int64",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": 101,
+          "max_value": 104,
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.product_id",
+      "label": "product_id",
+      "type": "source_column",
+      "metadata": {
+        "type": "int64",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": 201,
+          "max_value": 205,
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.quantity",
+      "label": "quantity",
+      "type": "source_column",
+      "metadata": {
+        "type": "int64",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": 1,
+          "max_value": 6,
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.unit_price",
+      "label": "unit_price",
+      "type": "source_column",
+      "metadata": {
+        "type": "double",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": 19.99,
+          "max_value": 149.99,
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.order_date",
+      "label": "order_date",
+      "type": "source_column",
+      "metadata": {
+        "type": "string",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": "2024-01-15",
+          "max_value": "2024-02-20",
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "column:orders.status",
+      "label": "status",
+      "type": "source_column",
+      "metadata": {
+        "type": "string",
+        "nullable": true,
+        "stats": {
+          "null_count": 0,
+          "distinct_count": null,
+          "min_value": "cancelled",
+          "max_value": "pending",
+          "avg_value": null,
+          "total_count": 10
+        }
+      }
+    },
+    {
+      "id": "output:customer_id",
+      "label": "customer_id",
+      "type": "output_column",
+      "metadata": {
+        "transformation": "direct",
+        "is_direct": true,
+        "source_count": 1
+      }
+    },
+    {
+      "id": "output:total_qty",
+      "label": "total_qty",
+      "type": "output_column",
+      "metadata": {
+        "transformation": "function(SUM)",
+        "is_direct": false,
+        "source_count": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "table:orders->column:orders.order_id",
+      "source": "table:orders",
+      "target": "column:orders.order_id",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.customer_id",
+      "source": "table:orders",
+      "target": "column:orders.customer_id",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.product_id",
+      "source": "table:orders",
+      "target": "column:orders.product_id",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.quantity",
+      "source": "table:orders",
+      "target": "column:orders.quantity",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.unit_price",
+      "source": "table:orders",
+      "target": "column:orders.unit_price",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.order_date",
+      "source": "table:orders",
+      "target": "column:orders.order_date",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "table:orders->column:orders.status",
+      "source": "table:orders",
+      "target": "column:orders.status",
+      "transformation": "contains",
+      "is_direct": true,
+      "metadata": {
+        "relationship": "table_column"
+      }
+    },
+    {
+      "id": "column:orders.customer_id->output:customer_id",
+      "source": "column:orders.customer_id",
+      "target": "output:customer_id",
+      "transformation": "direct",
+      "is_direct": true,
+      "metadata": {}
+    },
+    {
+      "id": "column:orders.quantity->output:total_qty",
+      "source": "column:orders.quantity",
+      "target": "output:total_qty",
+      "transformation": "function(SUM)",
+      "is_direct": false,
+      "metadata": {}
+    }
+  ],
+  "parquet_metadata": {
+    "orders": {
+      "path": "sample_data\\orders.parquet",
+      "is_partitioned": false,
+      "partition_columns": [],
+      "partitions": [],
+      "row_count": 10,
+      "file_count": 1,
+      "total_size_bytes": 5296,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "int64",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": 1,
+            "max_value": 10,
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "customer_id",
+          "type": "int64",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": 101,
+            "max_value": 104,
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "product_id",
+          "type": "int64",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": 201,
+            "max_value": 205,
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "quantity",
+          "type": "int64",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": 1,
+            "max_value": 6,
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "unit_price",
+          "type": "double",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": 19.99,
+            "max_value": 149.99,
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "order_date",
+          "type": "string",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": "2024-01-15",
+            "max_value": "2024-02-20",
+            "avg_value": null,
+            "total_count": 10
+          }
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "nullable": true,
+          "stats": {
+            "null_count": 0,
+            "distinct_count": null,
+            "min_value": "cancelled",
+            "max_value": "pending",
+            "avg_value": null,
+            "total_count": 10
+          }
+        }
+      ],
+      "raw_schema": {
+        "fields": [
+          {
+            "name": "order_id",
+            "type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "customer_id",
+            "type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "product_id",
+            "type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "quantity",
+            "type": "int64",
+            "nullable": true
+          },
+          {
+            "name": "unit_price",
+            "type": "double",
+            "nullable": true
+          },
+          {
+            "name": "order_date",
+            "type": "string",
+            "nullable": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "nullable": true
+          }
+        ]
+      }
+    }
+  },
+  "lineage_result": {
+    "query": "SELECT customer_id, SUM(quantity) as total_qty FROM orders GROUP BY customer_id",
+    "tables": [
+      {
+        "name": "orders",
+        "alias": "orders",
+        "columns": [],
+        "is_partitioned": false
+      }
+    ],
+    "output_columns": [
+      "customer_id",
+      "total_qty"
+    ],
+    "column_lineage": [
+      {
+        "output_column": "customer_id",
+        "source_columns": [
+          "orders.customer_id"
+        ],
+        "transformation": "direct",
+        "is_direct": true
+      },
+      {
+        "output_column": "total_qty",
+        "source_columns": [
+          "orders.quantity"
+        ],
+        "transformation": "function(SUM)",
+        "is_direct": false
+      }
+    ],
+    "query_type": "SELECT with GROUP BY"
+  }
+}

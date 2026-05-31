@@ -1,0 +1,16 @@
+{
+  "name": "png-steganography",
+  "version": "1.0.0",
+  "description": "Full-stack PNG steganography application with Rust/WASM",
+  "private": true,
+  "scripts": {
+    "build:wasm": "cd stegano-lib && cargo build --target wasm32-unknown-unknown --release && copy target\\wasm32-unknown-unknown\\release\\stegano_lib.wasm ..\\server\\wasm\\stegano_lib.wasm",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "build": "npm run build:wasm && npm run build:server && npm run build:client",
+    "install:all": "cd server && npm install && cd ..\\client && npm install",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "start": "cd server && npm start"
+  }
+}

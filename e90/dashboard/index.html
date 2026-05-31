@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LDPC 分布式重建仪表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .heatmap-cell {
+            width: 8px;
+            height: 8px;
+            display: inline-block;
+            margin: 1px;
+            border-radius: 2px;
+        }
+        .status-recovered { background-color: #10b981; }
+        .status-collected { background-color: #3b82f6; }
+        .status-unrecoverable { background-color: #ef4444; }
+        .status-missing { background-color: #e5e7eb; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 头部 -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                LDPC 分布式重建仪表板
+            </h1>
+            <p class="text-gray-400 mt-2">多节点协作镜像重建监控系统</p>
+        </header>
+
+        <!-- 任务选择器 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex-1 min-w-64">
+                    <label class="block text-sm font-medium text-gray-400 mb-2">选择重建任务</label>
+                    <select id="taskSelector" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
+                        🔄 刷新
+                    </button>
+                    <button onclick="autoRefresh()" id="autoRefreshBtn" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors">
+                        ⏸️ 自动刷新
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务概览卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">总块数</div>
+                <div id="totalBlocks" class="text-2xl font-bold">-</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">已收集</div>
+                <div id="collectedBlocks" class="text-2xl font-bold text-blue-400">-</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">已恢复</div>
+                <div id="recoveredBlocks" class="text-2xl font-bold text-green-400">-</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">不可恢复</div>
+                <div id="unrecoverableBlocks" class="text-2xl font-bold text-red-400">-</div>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="flex justify-between mb-2">
+                <span class="text-gray-400">收集进度</span>
+                <span id="progressText" class="font-medium">-</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-4">
+                <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="mt-2 text-sm text-gray-400">
+                状态: <span id="taskStatus" class="font-medium">-</span>
+            </div>
+        </div>
+
+        <!-- 主要内容区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 热力图 -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold mb-4">📊 块状态热力图</h2>
+                <div class="flex gap-4 mb-4 text-sm">
+                    <span class="flex items-center gap-2"><span class="heatmap-cell status-recovered"></span> 已恢复</span>
+                    <span class="flex items-center gap-2"><span class="heatmap-cell status-collected"></span> 已收集</span>
+                    <span class="flex items-center gap-2"><span class="heatmap-cell status-unrecoverable"></span> 不可恢复</span>
+                    <span class="flex items-center gap-2"><span class="heatmap-cell status-missing"></span> 缺失</span>
+                </div>
+                <div id="heatmapContainer" class="overflow-auto max-h-96 bg-gray-900 rounded p-3 font-mono text-xs">
+                    <p class="text-gray-500">请选择任务以查看热力图</p>
+                </div>
+                <div id="heatmapStats" class="mt-4 text-sm text-gray-400"></div>
+            </div>
+
+            <!-- 节点贡献 -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold mb-4">👥 节点贡献排行</h2>
+                <div id="nodeContributions" class="space-y-3">
+                    <p class="text-gray-500">请选择任务以查看节点贡献</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <!-- 恢复方法分布 -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold mb-4">📈 恢复方法分布</h2>
+                <canvas id="recoveryMethodChart" height="200"></canvas>
+            </div>
+
+            <!-- 节点贡献饼图 -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold mb-4">🥧 节点贡献分布</h2>
+                <canvas id="nodeContributionChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- 任务列表 -->
+        <div class="bg-gray-800 rounded-lg p-4 mt-6">
+            <h2 class="text-lg font-semibold mb-4">📋 所有重建任务</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-400 border-b border-gray-700">
+                            <th class="pb-3 pr-4">任务名称</th>
+                            <th class="pb-3 pr-4">镜像</th>
+                            <th class="pb-3 pr-4">状态</th>
+                            <th class="pb-3 pr-4">进度</th>
+                            <th class="pb-3">创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let autoRefreshInterval = null;
+        let currentTaskId = null;
+        let recoveryMethodChart = null;
+        let nodeContributionChart = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTasks();
+        });
+
+        // 加载任务列表
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/rebuild`);
+                const tasks = await response.json();
+
+                const selector = document.getElementById('taskSelector');
+                selector.innerHTML = '<option value="">请选择任务...</option>';
+
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.task_id;
+                    option.textContent = `${task.name} (${task.status} - ${task.collected_count}/${task.total_blocks})`;
+                    selector.appendChild(option);
+                });
+
+                if (tasks.length > 0) {
+                    selector.value = tasks[0].task_id;
+                    loadTaskData(tasks[0].task_id);
+                }
+
+                renderTasksTable(tasks);
+            } catch (error) {
+                console.error('加载任务列表失败:', error);
+            }
+        }
+
+        // 渲染任务表格
+        function renderTasksTable(tasks) {
+            const tbody = document.getElementById('tasksTable');
+            tbody.innerHTML = tasks.map(task => `
+                <tr class="border-b border-gray-700 hover:bg-gray-750 cursor-pointer" onclick="selectTask('${task.task_id}')">
+                    <td class="py-3 pr-4">${task.name}</td>
+                    <td class="py-3 pr-4">${task.image_name}</td>
+                    <td class="py-3 pr-4">
+                        <span class="px-2 py-1 rounded text-xs ${getStatusColor(task.status)}">${task.status}</span>
+                    </td>
+                    <td class="py-3 pr-4">${task.collected_count}/${task.total_blocks}</td>
+                    <td class="py-3">${new Date(task.created_at).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'collecting': 'bg-blue-600',
+                'recovering': 'bg-yellow-600',
+                'completed': 'bg-green-600',
+                'failed': 'bg-red-600'
+            };
+            return colors[status] || 'bg-gray-600';
+        }
+
+        function selectTask(taskId) {
+            document.getElementById('taskSelector').value = taskId;
+            loadTaskData(taskId);
+        }
+
+        // 监听任务选择
+        document.getElementById('taskSelector').addEventListener('change', (e) => {
+            if (e.target.value) {
+                loadTaskData(e.target.value);
+            }
+        });
+
+        // 加载任务数据
+        async function loadTaskData(taskId) {
+            currentTaskId = taskId;
+
+            try {
+                const [statusResponse, heatmapResponse, nodesResponse] = await Promise.all([
+                    fetch(`${API_BASE}/rebuild/${taskId}`),
+                    fetch(`${API_BASE}/rebuild/${taskId}/heatmap`),
+                    fetch(`${API_BASE}/rebuild/${taskId}/nodes`)
+                ]);
+
+                const status = await statusResponse.json();
+                const heatmap = await heatmapResponse.json();
+                const nodes = await nodesResponse.json();
+
+                updateStatusCards(status);
+                renderHeatmap(heatmap);
+                renderNodeContributions(nodes);
+                updateCharts(status, nodes);
+            } catch (error) {
+                console.error('加载任务数据失败:', error);
+            }
+        }
+
+        // 更新状态卡片
+        function updateStatusCards(status) {
+            document.getElementById('totalBlocks').textContent = status.total_blocks;
+            document.getElementById('collectedBlocks').textContent = status.collected_count;
+            document.getElementById('recoveredBlocks').textContent = status.recovered_count;
+            document.getElementById('unrecoverableBlocks').textContent = status.unrecoverable_count;
+
+            const progress = (status.collected_count / status.total_blocks * 100).toFixed(1);
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            document.getElementById('progressText').textContent = `${progress}% (${status.collected_count}/${status.total_blocks})`;
+            document.getElementById('taskStatus').textContent = status.status;
+            document.getElementById('taskStatus').className = `font-medium ${getStatusTextColor(status.status)}`;
+        }
+
+        function getStatusTextColor(status) {
+            const colors = {
+                'collecting': 'text-blue-400',
+                'recovering': 'text-yellow-400',
+                'completed': 'text-green-400',
+                'failed': 'text-red-400'
+            };
+            return colors[status] || 'text-gray-400';
+        }
+
+        // 渲染热力图
+        function renderHeatmap(heatmapData) {
+            const container = document.getElementById('heatmapContainer');
+            const stats = heatmapData.stats;
+
+            let html = '';
+            const lineLength = 100;
+
+            for (let start = 0; start < heatmapData.total_blocks; start += lineLength) {
+                const end = Math.min(start + lineLength, heatmapData.total_blocks);
+                let line = '';
+                for (let i = start; i < end; i++) {
+                    const status = heatmapData.heatmap[i].status;
+                    line += `<span class="heatmap-cell status-${status}" title="块 ${i}: ${status}"></span>`;
+                }
+                html += `<div class="leading-none">${line}</div>`;
+            }
+
+            container.innerHTML = html;
+
+            document.getElementById('heatmapStats').innerHTML = `
+                已恢复: <span class="text-green-400">${stats.recovered}</span> |
+                已收集: <span class="text-blue-400">${stats.collected}</span> |
+                不可恢复: <span class="text-red-400">${stats.unrecoverable}</span> |
+                缺失: <span class="text-gray-400">${stats.missing}</span>
+            `;
+        }
+
+        // 渲染节点贡献
+        function renderNodeContributions(nodes) {
+            const container = document.getElementById('nodeContributions');
+
+            if (nodes.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">暂无节点贡献数据</p>';
+                return;
+            }
+
+            const maxBlocks = Math.max(...nodes.map(n => n.blocks_contributed));
+
+            container.innerHTML = nodes.map((node, index) => {
+                const percentage = (node.blocks_contributed / maxBlocks * 100).toFixed(0);
+                const name = node.node_name || node.node_id.substring(0, 12);
+                const rankColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-gray-300' : index === 2 ? 'text-amber-600' : 'text-gray-400';
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+
+                return `
+                    <div class="bg-gray-700 rounded-lg p-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="${rankColor} font-medium">${medal} ${name}</span>
+                            <span class="text-sm text-gray-400">${node.blocks_contributed} 块</span>
+                        </div>
+                        <div class="w-full bg-gray-600 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            唯一块: ${node.unique_blocks} | 最后活跃: ${new Date(node.last_seen).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 更新图表
+        function updateCharts(status, nodes) {
+            // 恢复方法分布图表
+            const methodCtx = document.getElementById('recoveryMethodChart').getContext('2d');
+
+            if (recoveryMethodChart) {
+                recoveryMethodChart.destroy();
+            }
+
+            recoveryMethodChart = new Chart(methodCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['已恢复', '已收集', '不可恢复', '缺失'],
+                    datasets: [{
+                        data: [
+                            status.recovered_count,
+                            status.collected_count - status.recovered_count,
+                            status.unrecoverable_count,
+                            status.total_blocks - status.collected_count
+                        ],
+                        backgroundColor: ['#10b981', '#3b82f6', '#ef4444', '#e5e7eb'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+
+            // 节点贡献饼图
+            const nodeCtx = document.getElementById('nodeContributionChart').getContext('2d');
+
+            if (nodeContributionChart) {
+                nodeContributionChart.destroy();
+            }
+
+            const topNodes = nodes.slice(0, 8);
+            const colors = [
+                '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
+                '#10b981', '#06b6d4', '#6366f1', '#ef4444'
+            ];
+
+            nodeContributionChart = new Chart(nodeCtx, {
+                type: 'pie',
+                data: {
+                    labels: topNodes.map(n => n.node_name || n.node_id.substring(0, 8)),
+                    datasets: [{
+                        data: topNodes.map(n => n.blocks_contributed),
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 刷新数据
+        function refreshData() {
+            loadTasks();
+            if (currentTaskId) {
+                loadTaskData(currentTaskId);
+            }
+        }
+
+        // 自动刷新
+        function autoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.textContent = '▶️ 自动刷新';
+                btn.classList.remove('bg-green-700');
+                btn.classList.add('bg-gray-700');
+            } else {
+                autoRefreshInterval = setInterval(refreshData, 5000);
+                btn.textContent = '⏸️ 自动刷新';
+                btn.classList.remove('bg-gray-700');
+                btn.classList.add('bg-green-700');
+            }
+        }
+    </script>
+</body>
+</html>

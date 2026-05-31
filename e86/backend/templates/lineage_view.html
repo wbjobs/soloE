@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lineage Graph - Parquet Data Lineage</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; }
+        .header-actions { display: flex; gap: 10px; }
+        .main-content { display: flex; height: calc(100vh - 60px); }
+        .sidebar { width: 320px; background: white; border-right: 1px solid #e0e0e0; padding: 20px; overflow-y: auto; }
+        .graph-container { flex: 1; position: relative; }
+        #graph { width: 100%; height: 100%; }
+        .card { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .card h3 { font-size: 14px; margin-bottom: 10px; color: #333; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+        .info-row .label { color: #666; }
+        .info-row .value { color: #333; font-weight: 500; }
+        .btn { padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-secondary { background: rgba(255,255,255,0.2); color: white; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+        .node-info { font-size: 12px; }
+        .node-info .title { font-weight: 600; margin-bottom: 8px; color: #333; }
+        .node-info .meta { background: white; padding: 10px; border-radius: 6px; margin-top: 8px; }
+        .node-info .meta p { margin: 4px 0; color: #555; }
+        .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+        .loading { display: flex; justify-content: center; align-items: center; height: 100%; color: #999; font-size: 16px; }
+        .edge-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .filter-btn { padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; border: 1px solid #ddd; background: white; }
+        .filter-btn.active { background: #667eea; color: white; border-color: #667eea; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-box { background: white; padding: 10px; border-radius: 6px; text-align: center; }
+        .stat-box .num { font-size: 18px; font-weight: 600; color: #667eea; }
+        .stat-box .lbl { font-size: 10px; color: #999; text-transform: uppercase; }
+        .collapse-btn { position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid #667eea; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; cursor: pointer; color: #667eea; }
+        .collapse-btn:hover { background: #667eea; color: #fff; }
+        .collapsed-indicator { font-size: 10px; margin-left: 5px; opacity: 0.7; }
+        .hidden { display: none !important; }
+        .search-container { margin-bottom: 16px; }
+        .search-container input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+        .search-results { margin-top: 8px; max-height: 200px; overflow-y: auto; }
+        .search-result-item { padding: 6px 8px; margin: 2px 0; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .search-result-item:hover { background: #f0f0f0; }
+        .impact-highlight { border: 2px solid #f44336 !important; }
+        .impact-source { background: #f44336 !important; border: 3px solid #b71c1c !important; }
+        .impact-info { background: #fff3f3; border-left: 4px solid #f44336; padding: 10px; margin-top: 10px; font-size: 12px; }
+        .impact-info .count { font-size: 18px; font-weight: bold; color: #f44336; }
+        .impact-clear-btn { margin-top: 8px; padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        .impact-clear-btn:hover { background: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lineage Graph: {{ lineage_id }}</h1>
+        <div class="header-actions">
+            <button onclick="exportJSON()" class="btn btn-secondary">Export JSON</button>
+            <button onclick="exportCSV()" class="btn btn-secondary">Export CSV</button>
+            <a href="/" class="btn btn-secondary">← Back</a>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="sidebar">
+            <div class="card">
+                <h3>Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="num" id="totalNodes">-</div>
+                        <div class="lbl">Nodes</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="num" id="totalEdges">-</div>
+                        <div class="lbl">Edges</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Search & Impact Analysis</h3>
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search column name..." oninput="handleSearch(event)">
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+                <div id="impactAnalysis" style="display: none;">
+                    <div class="impact-info">
+                        <strong>Impact Analysis</strong><br>
+                        Source: <code id="impactSource"></code><br>
+                        <span class="count" id="impactCount">0</span> columns affected
+                    </div>
+                    <button class="impact-clear-btn" onclick="clearImpact()">Clear Impact Highlight</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Legend</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4CAF50;"></div>
+                        <span>Table</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2196F3;"></div>
+                        <span>Source Column</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FF9800;"></div>
+                        <span>Output Column</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Edge Filter</h3>
+                <div class="edge-filter">
+                    <button class="filter-btn active" onclick="filterEdges('all')">All</button>
+                    <button class="filter-btn" onclick="filterEdges('direct')">Direct Only</button>
+                    <button class="filter-btn" onclick="filterEdges('transform')">Transform Only</button>
+                </div>
+            </div>
+            <div class="card" id="collapseCard" style="display: none;">
+                <h3>Collapse/Expand</h3>
+                <div class="edge-filter">
+                    <button class="filter-btn" onclick="collapseAll()">Collapse All</button>
+                    <button class="filter-btn" onclick="expandAll()">Expand All</button>
+                </div>
+                <p style="font-size: 11px; color: #666; margin-top: 8px;">
+                    Double-click a collapsible node to toggle its children
+                </p>
+            </div>
+            <div class="card" id="nodeInfoCard" style="display: none;">
+                <h3>Selected Node</h3>
+                <div class="node-info" id="nodeInfo"></div>
+            </div>
+            <div class="card" id="queryCard">
+                <h3>SQL Query</h3>
+                <div id="queryContent" style="font-family: monospace; font-size: 11px; color: #555; white-space: pre-wrap; word-break: break-all;"></div>
+            </div>
+        </div>
+        <div class="graph-container">
+            <div id="graph"></div>
+            <div id="loading" class="loading">Loading lineage graph...</div>
+        </div>
+    </div>
+
+    <script>
+        let lineageData = null;
+        let chart = null;
+        let currentFilter = 'all';
+        let collapsedNodes = new Set();
+        let hasNested = false;
+        const lineageId = "{{ lineage_id }}";
+        let impactData = null;
+        let searchTimeout = null;
+
+        const nodeColors = {
+            'table': '#4CAF50',
+            'source_column': '#2196F3',
+            'output_column': '#FF9800'
+        };
+
+        async function loadLineage() {
+            const response = await fetch(`/api/lineage/${lineageId}`);
+            lineageData = await response.json();
+
+            hasNested = lineageData.has_nested_columns || lineageData.nodes.some(n => n.is_collapsible);
+            if (hasNested) {
+                document.getElementById('collapseCard').style.display = 'block';
+            }
+
+            document.getElementById('totalNodes').textContent = lineageData.nodes.length;
+            document.getElementById('totalEdges').textContent = lineageData.edges.length;
+
+            if (lineageData.lineage_result && lineageData.lineage_result.query) {
+                document.getElementById('queryContent').textContent = lineageData.lineage_result.query;
+            }
+
+            renderGraph();
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function filterEdges(type) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderGraph();
+        }
+
+        function getFilteredEdges() {
+            if (currentFilter === 'all') return lineageData.edges;
+            if (currentFilter === 'direct') return lineageData.edges.filter(e => e.is_direct);
+            if (currentFilter === 'transform') return lineageData.edges.filter(e => !e.is_direct);
+            return lineageData.edges;
+        }
+
+        function getVisibleNodesAndEdges() {
+            const edges = getFilteredEdges();
+            const nodeMap = new Map();
+            lineageData.nodes.forEach(n => nodeMap.set(n.id, n));
+
+            const hiddenIds = new Set();
+            collapsedNodes.forEach(nodeId => {
+                const node = nodeMap.get(nodeId);
+                if (node && node.children) {
+                    function collectChildren(parentId) {
+                        const parent = nodeMap.get(parentId);
+                        if (parent && parent.children) {
+                            parent.children.forEach(childId => {
+                                hiddenIds.add(childId);
+                                collectChildren(childId);
+                            });
+                        }
+                    }
+                    collectChildren(nodeId);
+                }
+            });
+
+            const visibleEdges = edges.filter(e => !hiddenIds.has(e.source) && !hiddenIds.has(e.target));
+            const usedNodeIds = new Set();
+            visibleEdges.forEach(e => {
+                usedNodeIds.add(e.source);
+                usedNodeIds.add(e.target);
+            });
+
+            const visibleNodes = lineageData.nodes.filter(n => usedNodeIds.has(n.id) || !hiddenIds.has(n.id));
+
+            return { visibleNodes, visibleEdges, nodeMap };
+        }
+
+        function toggleCollapse(nodeId) {
+            if (collapsedNodes.has(nodeId)) {
+                collapsedNodes.delete(nodeId);
+            } else {
+                collapsedNodes.add(nodeId);
+            }
+            renderGraph();
+        }
+
+        function collapseAll() {
+            lineageData.nodes.forEach(n => {
+                if (n.is_collapsible && n.children && n.children.length > 0) {
+                    collapsedNodes.add(n.id);
+                }
+            });
+            renderGraph();
+        }
+
+        function expandAll() {
+            collapsedNodes.clear();
+            renderGraph();
+        }
+
+        function renderGraph() {
+            const chartDom = document.getElementById('graph');
+            if (!chart) {
+                chart = echarts.init(chartDom);
+                window.addEventListener('resize', () => chart.resize());
+
+                chart.on('click', function(params) {
+                    if (params.dataType === 'node') {
+                        showNodeInfo(params.data);
+                    }
+                });
+
+                chart.on('dblclick', function(params) {
+                    if (params.dataType === 'node') {
+                        const nodeId = params.data.id;
+                        const nodeData = lineageData.nodes.find(n => n.id === nodeId);
+                        if (nodeData && nodeData.is_collapsible) {
+                            toggleCollapse(nodeId);
+                        }
+                    }
+                });
+            }
+
+            const { visibleNodes, visibleEdges, nodeMap } = getVisibleNodesAndEdges();
+
+            const nodes = visibleNodes.map(n => {
+                const isCollapsed = collapsedNodes.has(n.id);
+                const hasChildren = n.is_collapsible && n.children && n.children.length > 0;
+                const isAffected = isImpactAffectedNode(n.id);
+                const isSource = isImpactSourceNode(n.id, n.label);
+
+                let label = n.label;
+                if (hasChildren) {
+                    const childCount = n.children.length;
+                    label = isCollapsed ? `${label} [+${childCount}]` : `${label} [-]`;
+                }
+
+                let nodeColor = nodeColors[n.type] || '#999';
+                let borderColor = hasChildren ? '#FFD700' : 'transparent';
+                let borderWidth = hasChildren ? 3 : 0;
+
+                if (isSource) {
+                    nodeColor = '#f44336';
+                    borderColor = '#b71c1c';
+                    borderWidth = 4;
+                } else if (isAffected) {
+                    borderColor = '#f44336';
+                    borderWidth = 3;
+                }
+
+                return {
+                    id: n.id,
+                    name: label,
+                    category: n.type,
+                    symbolSize: isSource ? 50 : (n.type === 'table' ? 50 : 35),
+                    itemStyle: {
+                        color: nodeColor,
+                        borderColor: borderColor,
+                        borderWidth: borderWidth
+                    },
+                    label: {
+                        show: true,
+                        formatter: label,
+                        fontSize: n.type === 'table' ? 12 : 10,
+                        fontWeight: isSource || isAffected ? 'bold' : 'normal'
+                    },
+                    rawData: n
+                };
+            });
+
+            const chartEdges = visibleEdges.map(e => {
+                const edgeId = `${e.source}->${e.target}`;
+                const isAffected = isImpactAffectedEdge(edgeId);
+
+                let edgeColor = e.is_direct ? '#81C784' : '#FF8A65';
+                let edgeWidth = e.is_direct ? 2 : 3;
+
+                if (isAffected) {
+                    edgeColor = '#f44336';
+                    edgeWidth = 4;
+                }
+
+                return {
+                    source: e.source,
+                    target: e.target,
+                    lineStyle: {
+                        color: edgeColor,
+                        width: edgeWidth,
+                        type: e.is_direct ? 'solid' : 'dashed',
+                        curveness: 0.1
+                    },
+                    label: {
+                        show: !e.is_direct || isAffected,
+                        formatter: e.transformation,
+                        fontSize: 9,
+                        backgroundColor: '#fff',
+                        padding: [2, 4],
+                        borderRadius: 3
+                    },
+                    rawData: e
+                };
+            });
+
+            const option = {
+                tooltip: {
+                    formatter: function(params) {
+                        if (params.dataType === 'node') {
+                            const n = params.data.rawData;
+                            let html = `<div style="font-weight: bold; margin-bottom: 5px;">${n.label}</div>`;
+                            html += `<div style="color: #666; font-size: 11px;">Type: ${n.type}</div>`;
+                            if (n.metadata && n.metadata.type) {
+                                html += `<div style="color: #666; font-size: 11px;">Data Type: ${n.metadata.type}</div>`;
+                            }
+                            if (n.is_collapsible) {
+                                html += `<div style="color: #FF9800; font-size: 11px; margin-top: 5px;">Double-click to ${collapsedNodes.has(n.id) ? 'expand' : 'collapse'}</div>`;
+                            }
+                            return html;
+                        } else if (params.dataType === 'edge') {
+                            const e = params.data.rawData;
+                            return `<div style="font-weight: bold;">${e.transformation}</div><div style="color: #666; font-size: 11px;">Direct: ${e.is_direct}</div>`;
+                        }
+                        return '';
+                    }
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    roam: true,
+                    draggable: true,
+                    data: nodes,
+                    links: chartEdges,
+                    force: {
+                        repulsion: 400,
+                        edgeLength: [80, 150],
+                        gravity: 0.1,
+                        layoutAnimation: true
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        lineStyle: {
+                            width: 4
+                        }
+                    },
+                    lineStyle: {
+                        opacity: 0.8
+                    },
+                    edgeSymbol: ['none', 'arrow'],
+                    edgeSymbolSize: [0, 8]
+                }]
+            };
+
+            chart.setOption(option, true);
+        }
+
+        function showNodeInfo(nodeData) {
+            const n = nodeData.rawData;
+            const card = document.getElementById('nodeInfoCard');
+            const info = document.getElementById('nodeInfo');
+
+            let html = `<div class="title">${n.label}</div>`;
+            html += `<div class="meta">`;
+            html += `<p><strong>Type:</strong> ${n.type}</p>`;
+            if (n.metadata) {
+                if (n.metadata.type) html += `<p><strong>Data Type:</strong> ${n.metadata.type}</p>`;
+                if (n.metadata.nullable !== undefined) html += `<p><strong>Nullable:</strong> ${n.metadata.nullable}</p>`;
+                if (n.metadata.is_nested !== undefined) html += `<p><strong>Nested:</strong> ${n.metadata.is_nested}</p>`;
+                if (n.metadata.is_leaf !== undefined) html += `<p><strong>Leaf:</strong> ${n.metadata.is_leaf}</p>`;
+                if (n.metadata.row_count !== undefined) html += `<p><strong>Rows:</strong> ${n.metadata.row_count.toLocaleString()}</p>`;
+                if (n.metadata.file_count !== undefined) html += `<p><strong>Files:</strong> ${n.metadata.file_count}</p>`;
+                if (n.metadata.is_partitioned !== undefined) html += `<p><strong>Partitioned:</strong> ${n.metadata.is_partitioned}</p>`;
+                if (n.metadata.transformation) html += `<p><strong>Transformation:</strong> ${n.metadata.transformation}</p>`;
+                if (n.metadata.stats) {
+                    const stats = n.metadata.stats;
+                    html += `<p><strong>Stats:</strong></p>`;
+                    html += `<div style="padding-left: 10px; font-size: 11px;">`;
+                    if (stats.total_count !== undefined) html += `<p>Total: ${stats.total_count.toLocaleString()}</p>`;
+                    if (stats.null_count !== undefined) html += `<p>Nulls: ${stats.null_count.toLocaleString()}</p>`;
+                    if (stats.distinct_count !== undefined) html += `<p>Distinct: ${stats.distinct_count.toLocaleString()}</p>`;
+                    if (stats.min_value !== undefined && stats.min_value !== null) html += `<p>Min: ${stats.min_value}</p>`;
+                    if (stats.max_value !== undefined && stats.max_value !== null) html += `<p>Max: ${stats.max_value}</p>`;
+                    if (stats.avg_value !== undefined && stats.avg_value !== null) html += `<p>Avg: ${stats.avg_value.toFixed(2)}</p>`;
+                    html += `</div>`;
+                }
+            }
+            if (n.is_collapsible && n.children && n.children.length > 0) {
+                const isCollapsed = collapsedNodes.has(n.id);
+                html += `<p style="margin-top: 10px;">`;
+                html += `<button onclick="toggleCollapse('${n.id}')" class="btn btn-primary" style="width: 100%;">`;
+                html += isCollapsed ? `Expand (${n.children.length} children)` : `Collapse (${n.children.length} children)`;
+                html += `</button></p>`;
+            }
+            if (n.type === 'source_column' || n.type === 'output_column') {
+                html += `<p style="margin-top: 10px;">`;
+                html += `<button onclick="analyzeImpact('${n.label}')" class="btn btn-primary" style="width: 100%; background: #f44336;">`;
+                html += `🔍 Analyze Impact`;
+                html += `</button></p>`;
+            }
+            if (n.parent_id) {
+                html += `<p style="margin-top: 8px; font-size: 11px; color: #666;">`;
+                html += `Parent: <code>${n.parent_id}</code></p>`;
+            }
+            html += `</div>`;
+
+            info.innerHTML = html;
+            card.style.display = 'block';
+        }
+
+        function exportJSON() {
+            window.open(`/api/lineage/${lineageId}/export/json`, '_blank');
+        }
+
+        function exportCSV() {
+            window.open(`/api/lineage/${lineageId}/export/csv`, '_blank');
+        }
+
+        async function handleSearch(event) {
+            const query = event.target.value.trim();
+            clearTimeout(searchTimeout);
+
+            if (query.length < 2) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/lineage/${lineageId}/search?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+
+                    const resultsDiv = document.getElementById('searchResults');
+                    if (data.count === 0) {
+                        resultsDiv.innerHTML = '<div style="font-size: 11px; color: #999; padding: 8px;">No results found</div>';
+                        return;
+                    }
+
+                    let html = '';
+                    for (const result of data.results) {
+                        html += `<div class="search-result-item" onclick="onSearchResultClick('${result.label}', '${result.id}')">
+                            <strong>${result.label}</strong><br>
+                            <small style="color: #999;">${result.type}</small>
+                        </div>`;
+                    }
+                    resultsDiv.innerHTML = html;
+                } catch (e) {
+                    console.error('Search error:', e);
+                }
+            }, 300);
+        }
+
+        async function onSearchResultClick(columnName, nodeId) {
+            document.getElementById('searchInput').value = columnName;
+            document.getElementById('searchResults').innerHTML = '';
+            await analyzeImpact(columnName);
+        }
+
+        async function analyzeImpact(columnName) {
+            try {
+                const response = await fetch(`/api/lineage/${lineageId}/impact`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ column: columnName, max_depth: 10 })
+                });
+
+                impactData = await response.json();
+
+                document.getElementById('impactAnalysis').style.display = 'block';
+                document.getElementById('impactSource').textContent = impactData.source_column;
+                document.getElementById('impactCount').textContent = impactData.total_affected;
+
+                renderGraph();
+            } catch (e) {
+                console.error('Impact analysis error:', e);
+            }
+        }
+
+        function clearImpact() {
+            impactData = null;
+            document.getElementById('impactAnalysis').style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            renderGraph();
+        }
+
+        function isImpactAffectedNode(nodeId) {
+            if (!impactData) return false;
+            return impactData.affected_node_ids.includes(nodeId);
+        }
+
+        function isImpactSourceNode(nodeId, nodeLabel) {
+            if (!impactData) return false;
+            return nodeLabel === impactData.source_column || 
+                   nodeId === `column:${impactData.source_column}` ||
+                   nodeId.includes(impactData.source_column);
+        }
+
+        function isImpactAffectedEdge(edgeId) {
+            if (!impactData) return false;
+            return impactData.affected_edge_ids.includes(edgeId);
+        }
+
+        loadLineage();
+    </script>
+</body>
+</html>
