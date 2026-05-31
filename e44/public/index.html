@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P CDN - 资源下载测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .status-item .label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .status-item .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            min-width: 50px;
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-item .time {
+            color: #6a9955;
+            margin-right: 10px;
+        }
+
+        .log-item.info {
+            color: #569cd6;
+        }
+
+        .log-item.success {
+            color: #6a9955;
+        }
+
+        .log-item.error {
+            color: #f44747;
+        }
+
+        .resource-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .resource-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .resource-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .resource-info p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .resource-actions .btn {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .connection-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .connection-status.connected .status-dot {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .connection-status.disconnected .status-dot {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .peer-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .peer-badge {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+        }
+
+        .no-peers {
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 P2P CDN 下载系统</h1>
+            <p>基于 WebRTC 的点对点内容分发网络</p>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📊 系统状态</h2>
+                <div id="connectionStatus" class="connection-status disconnected">
+                    <div class="status-dot"></div>
+                    <span>未连接</span>
+                </div>
+            </div>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="label">节点 ID</div>
+                    <div class="value" id="peerId">-</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">已连接节点</div>
+                    <div class="value" id="connectedPeers">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">已下载分片</div>
+                    <div class="value" id="downloadedChunks">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">总分片</div>
+                    <div class="value" id="totalChunks">0</div>
+                </div>
+            </div>
+
+            <div>
+                <strong>已连接节点列表：</strong>
+                <div class="peer-list" id="peerList">
+                    <span class="no-peers">暂无连接</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📁 注册新资源</h2>
+            <div class="form-group">
+                <label>资源名称</label>
+                <input type="text" id="resourceName" placeholder="例如：游戏资源包">
+            </div>
+            <div class="form-group">
+                <label>资源大小 (字节)</label>
+                <input type="number" id="resourceSize" placeholder="例如：10485760">
+            </div>
+            <div class="form-group">
+                <label>源站 URL</label>
+                <input type="text" id="sourceUrl" placeholder="https://example.com/file.zip">
+            </div>
+            <div class="form-group">
+                <label>MIME 类型</label>
+                <input type="text" id="mimeType" placeholder="application/zip">
+            </div>
+            <button class="btn" onclick="registerResource()">注册资源</button>
+        </div>
+
+        <div class="card">
+            <h2>📦 资源列表</h2>
+            <button class="btn" onclick="loadResources()" style="margin-bottom: 20px;">刷新资源列表</button>
+            <div class="resource-list" id="resourceList">
+                <p style="color: #999;">加载中...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⬇️ 下载进度</h2>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+                </div>
+            </div>
+            <div id="currentResource" style="margin-bottom: 20px;">
+                <strong>当前下载：</strong>
+                <span id="currentResourceName">无</span>
+            </div>
+            <button class="btn" onclick="testDownload()" id="testBtn" disabled>
+                测试从源站下载
+            </button>
+            <button class="btn" onclick="disconnectSDK()" style="margin-left: 10px;">
+                断开连接
+            </button>
+        </div>
+
+        <div class="card">
+            <h2>📝 运行日志</h2>
+            <div class="log-container" id="logContainer"></div>
+        </div>
+    </div>
+
+    <script src="/p2p-cdn-sdk.js"></script>
+    <script>
+        let sdk = null;
+        let currentResourceId = null;
+
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.innerHTML = `<span class="time">[${time}]</span>${message}`;
+            container.insertBefore(div, container.firstChild);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            if (connected) {
+                status.className = 'connection-status connected';
+                status.querySelector('span').textContent = '已连接';
+            } else {
+                status.className = 'connection-status disconnected';
+                status.querySelector('span').textContent = '未连接';
+            }
+        }
+
+        function updateStats() {
+            if (sdk) {
+                const stats = sdk.getStats();
+                document.getElementById('peerId').textContent = stats.peerId.substring(0, 15) + '...';
+                document.getElementById('connectedPeers').textContent = stats.connectedPeers;
+                document.getElementById('downloadedChunks').textContent = stats.downloadedChunks;
+                document.getElementById('totalChunks').textContent = stats.totalChunks;
+            }
+        }
+
+        async function initSDK() {
+            try {
+                sdk = new P2PCDNSDK({
+                    wsUrl: 'ws://localhost:3001'
+                });
+
+                sdk.on('peerConnected', (peerId) => {
+                    log(`节点已连接: ${peerId.substring(0, 15)}...`, 'success');
+                    updatePeerList();
+                    updateStats();
+                });
+
+                sdk.on('peerDisconnected', (peerId) => {
+                    log(`节点已断开: ${peerId.substring(0, 15)}...`, 'error');
+                    updatePeerList();
+                    updateStats();
+                });
+
+                sdk.on('chunkDownloaded', (data) => {
+                    log(`分片 ${data.chunkIndex} 下载完成 (${data.size} 字节)`, 'success');
+                    updateStats();
+                    updateProgress();
+                });
+
+                sdk.on('progress', (data) => {
+                    updateProgress();
+                });
+
+                sdk.on('downloadComplete', (blob) => {
+                    log('下载完成！文件大小: ' + blob.size + ' 字节', 'success');
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'downloaded_file';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+
+                sdk.on('resourceInfo', (resource) => {
+                    log(`资源信息已加载: ${resource.name}`, 'info');
+                    document.getElementById('currentResourceName').textContent = resource.name;
+                    currentResourceId = resource.resourceId;
+                    updateStats();
+                });
+
+                sdk.on('sourceProgress', (data) => {
+                    log(`从源站下载: ${data.downloaded}/${data.total} 字节`, 'info');
+                });
+
+                await sdk.connect();
+                
+                updateConnectionStatus(true);
+                updateStats();
+                document.getElementById('testBtn').disabled = false;
+                log('SDK 初始化成功', 'success');
+
+            } catch (error) {
+                log('SDK 初始化失败: ' + error.message, 'error');
+            }
+        }
+
+        function updateProgress() {
+            if (sdk && sdk.resourceInfo) {
+                const progress = (sdk.downloadedChunks.size / sdk.resourceInfo.totalChunks) * 100;
+                const progressFill = document.getElementById('progressFill');
+                progressFill.style.width = progress + '%';
+                progressFill.textContent = Math.round(progress) + '%';
+            }
+        }
+
+        function updatePeerList() {
+            const peerList = document.getElementById('peerList');
+            if (sdk && sdk.connections.size > 0) {
+                peerList.innerHTML = '';
+                sdk.connections.forEach((_, peerId) => {
+                    const badge = document.createElement('span');
+                    badge.className = 'peer-badge';
+                    badge.textContent = peerId.substring(0, 12) + '...';
+                    peerList.appendChild(badge);
+                });
+            } else {
+                peerList.innerHTML = '<span class="no-peers">暂无连接</span>';
+            }
+        }
+
+        async function registerResource() {
+            const name = document.getElementById('resourceName').value;
+            const size = parseInt(document.getElementById('resourceSize').value);
+            const sourceUrl = document.getElementById('sourceUrl').value;
+            const mimeType = document.getElementById('mimeType').value;
+
+            if (!name || !size || !sourceUrl) {
+                log('请填写完整的资源信息', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/api/resources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, size, sourceUrl, mimeType })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    log(`资源注册成功，ID: ${data.resource.resourceId}`, 'success');
+                    loadResources();
+                } else {
+                    log('资源注册失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                log('请求失败: ' + error.message, 'error');
+            }
+        }
+
+        async function loadResources() {
+            try {
+                const response = await fetch('http://localhost:3000/api/resources');
+                const data = await response.json();
+                
+                const container = document.getElementById('resourceList');
+                if (data.success && data.resources.length > 0) {
+                    container.innerHTML = data.resources.map(resource => `
+                        <div class="resource-item">
+                            <div class="resource-info">
+                                <h3>${resource.name}</h3>
+                                <p>ID: ${resource.resourceId}</p>
+                                <p>大小: ${(resource.size / 1024 / 1024).toFixed(2)} MB | 分片: ${resource.totalChunks}</p>
+                            </div>
+                            <div class="resource-actions">
+                                <button class="btn" onclick="downloadResource('${resource.resourceId}')">
+                                    P2P 下载
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #999;">暂无资源</p>';
+                }
+            } catch (error) {
+                log('加载资源列表失败: ' + error.message, 'error');
+            }
+        }
+
+        async function downloadResource(resourceId) {
+            if (!sdk) {
+                log('请先初始化 SDK', 'error');
+                return;
+            }
+
+            try {
+                log(`开始下载资源: ${resourceId}`, 'info');
+                await sdk.downloadResource(resourceId);
+            } catch (error) {
+                log('下载失败: ' + error.message, 'error');
+            }
+        }
+
+        async function testDownload() {
+            if (!sdk) {
+                log('请先初始化 SDK', 'error');
+                return;
+            }
+
+            try {
+                const size = 10 * 1024 * 1024;
+                const testData = new Uint8Array(size);
+                for (let i = 0; i < size; i++) {
+                    testData[i] = i % 256;
+                }
+
+                const blob = new Blob([testData]);
+                const sourceUrl = URL.createObjectURL(blob);
+
+                log('开始从源站下载测试文件 (10MB)', 'info');
+                await sdk.downloadFromSource(sourceUrl);
+
+            } catch (error) {
+                log('测试下载失败: ' + error.message, 'error');
+            }
+        }
+
+        function disconnectSDK() {
+            if (sdk) {
+                sdk.disconnect();
+                sdk = null;
+                updateConnectionStatus(false);
+                document.getElementById('testBtn').disabled = true;
+                log('SDK 已断开连接', 'info');
+            }
+        }
+
+        window.onload = function() {
+            log('页面加载完成，正在初始化 SDK...', 'info');
+            initSDK();
+            loadResources();
+            setInterval(updateStats, 2000);
+        };
+    </script>
+</body>
+</html>

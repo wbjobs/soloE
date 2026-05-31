@@ -1,0 +1,79 @@
+# ==============================================================================
+# P2P CDN 系统 Coturn TURN 服务器 Docker Compose 配置
+# ==============================================================================
+# 使用方法:
+#   1. 复制 .env.example 为 .env 并配置参数
+#   2. 运行: docker-compose up -d
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: p2p-cdn-coturn
+    restart: unless-stopped
+    network_mode: host  # 必须使用 host 网络模式才能正确获取客户端 IP
+    
+    environment:
+      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP:-auto}
+      - TURN_LISTENING_PORT=${TURN_LISTENING_PORT:-3478}
+      - TURN_TLS_LISTENING_PORT=${TURN_TLS_LISTENING_PORT:-5349}
+      - TURN_USER=${TURN_USER:-p2pcdn}
+      - TURN_PASSWORD=${TURN_PASSWORD:-}
+      - TURN_REALM=${TURN_REALM:-p2p-cdn-system}
+      - TURN_MIN_PORT=${TURN_MIN_PORT:-49152}
+      - TURN_MAX_PORT=${TURN_MAX_PORT:-65535}
+      - TURN_VERBOSE=${TURN_VERBOSE:-true}
+    
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf:ro
+      - ./data:/var/lib/coturn
+      - ./logs:/var/log/turnserver
+      - ./certificates:/etc/coturn/certificates:ro
+    
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    
+    healthcheck:
+      test: ["CMD", "turnadmin", "-l", "-c", "/etc/coturn/turnserver.conf"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+# 可选：搭配 Prometheus + Grafana 监控
+#  prometheus:
+#    image: prom/prometheus:latest
+#    container_name: p2p-cdn-prometheus
+#    ports:
+#      - "9090:9090"
+#    volumes:
+#      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+#
+#  grafana:
+#    image: grafana/grafana:latest
+#    container_name: p2p-cdn-grafana
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      - GF_SECURITY_ADMIN_PASSWORD=your_admin_password
+#    volumes:
+#      - grafana_data:/var/lib/grafana
+#
+#volumes:
+#  grafana_data:
