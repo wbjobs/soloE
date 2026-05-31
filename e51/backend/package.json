@@ -1,0 +1,20 @@
+{
+  "name": "webrtc-sfu-server",
+  "version": "1.0.0",
+  "description": "WebRTC SFU Server with mediasoup",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "https": "^1.0.0",
+    "socket.io": "^4.7.2",
+    "mediasoup": "^3.9.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

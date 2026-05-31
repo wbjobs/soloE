@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "codesmell-cli"
+version = "0.1.0"
+description = "代码异味分析CLI工具，支持Python和JavaScript"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+tree-sitter = "^0.20.4"
+tree-sitter-python = "^0.20.4"
+tree-sitter-javascript = "^0.20.1"
+click = "^8.1.7"
+colorama = "^0.4.6"
+requests = "^2.31.0"
+pygments = "^2.17.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+codesmell = "codesmell.cli:main"

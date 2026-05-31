@@ -1,0 +1,12 @@
+server:
+  addr: ":4242"
+  enable_0rtt: true
+  max_incoming_streams: 100
+
+client:
+  server_addr: "localhost:4242"
+  local_listen: ":8082"
+  target_addr: "example.com:80"
+
+log:
+  level: "info"

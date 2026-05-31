@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "totalModules": 3,
+    "totalDependencies": 4,
+    "externalDependencies": [
+      "fs"
+    ],
+    "analysisTime": 3,
+    "entryPoints": [
+      "test\\a.ts",
+      "test\\b.ts",
+      "test\\c.ts"
+    ]
+  },
+  "circularDependencies": [
+    {
+      "path": [
+        "test\\a.ts",
+        "test\\b.ts",
+        "test\\c.ts",
+        "test\\a.ts"
+      ],
+      "chain": "test\\a.ts → test\\b.ts → test\\c.ts → test\\a.ts"
+    }
+  ],
+  "modules": {
+    "test\\c.ts": {
+      "dependencies": [
+        {
+          "module": "./a",
+          "resolvedPath": "test\\a.ts",
+          "isRelative": true,
+          "isExternal": false
+        }
+      ],
+      "dependents": [
+        "test\\b.ts"
+      ]
+    },
+    "test\\b.ts": {
+      "dependencies": [
+        {
+          "module": "./c",
+          "resolvedPath": "test\\c.ts",
+          "isRelative": true,
+          "isExternal": false
+        }
+      ],
+      "dependents": [
+        "test\\a.ts"
+      ]
+    },
+    "test\\a.ts": {
+      "dependencies": [
+        {
+          "module": "./b",
+          "resolvedPath": "test\\b.ts",
+          "isRelative": true,
+          "isExternal": false
+        },
+        {
+          "module": "fs",
+          "isRelative": false,
+          "isExternal": true
+        }
+      ],
+      "dependents": []
+    }
+  }
+}

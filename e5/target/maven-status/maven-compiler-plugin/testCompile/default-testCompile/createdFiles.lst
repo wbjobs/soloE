@@ -1,0 +1,3 @@
+com\example\logquery\controller\LogQueryControllerIntegrationTest.class
+com\example\logquery\service\LogParserServiceTest.class
+com\example\logquery\service\QueryFilterServiceTest.class
