@@ -1,0 +1,35 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-center
+
+etcd:
+  endpoints: http://localhost:2379
+  user:
+  password:
+  connect-timeout: 5000
+  retry-delay: 1000
+  max-retries: 3
+
+config:
+  base-path: /config-center
+  history-limit: 100
+  long-poll-timeout: 60000
+  encryption:
+    key: ConfigCenterSecretKey256Bit12345678
+  cluster:
+    sync:
+      enabled: true
+      interval: 30000
+    self-url: http://localhost:8888
+    peer-nodes:
+  test:
+    script-dir: ./scripts
+    timeout: 30000
+
+logging:
+  level:
+    com.configcenter: DEBUG
+    io.etcd: INFO
