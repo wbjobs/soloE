@@ -1,0 +1,17 @@
+{
+  "name": "markdown-notes-sync-server",
+  "version": "1.0.0",
+  "description": "Sync server for Markdown Notes with Yjs CRDT",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "yjs": "^13.6.11",
+    "level": "^8.0.1",
+    "uuid": "^9.0.1"
+  }
+}
