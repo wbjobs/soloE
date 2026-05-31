@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git仓库分析器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <h1>Git仓库分析器</h1>
+      <div class="controls">
+        <button id="selectRepoBtn" class="btn btn-primary">选择Git仓库</button>
+        <button id="refreshBtn" class="btn btn-secondary" disabled>刷新数据</button>
+      </div>
+    </header>
+
+    <div id="welcome" class="welcome">
+      <div class="welcome-icon">📊</div>
+      <h2>欢迎使用Git仓库分析器</h2>
+      <p>点击上方"选择Git仓库"按钮开始分析您的代码仓库</p>
+    </div>
+
+    <div id="dashboard" class="dashboard" style="display: none;">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value" id="totalCommits">0</div>
+          <div class="stat-label">总提交数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalContributors">0</div>
+          <div class="stat-label">贡献者</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalAnomalies">0</div>
+          <div class="stat-label">异常检测</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="repoPath">-</div>
+          <div class="stat-label">当前仓库</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>提交类型分布</h3>
+          <div id="pieChart"></div>
+        </div>
+
+        <div class="chart-card">
+          <h3>活跃度热力图</h3>
+          <div id="heatmapChart"></div>
+        </div>
+
+        <div class="chart-card full-width">
+          <h3>提交时间线</h3>
+          <div id="timelineChart"></div>
+        </div>
+
+        <div class="chart-card">
+          <h3>Top贡献者</h3>
+          <div id="contributorsList"></div>
+        </div>
+
+        <div class="chart-card">
+          <h3>异常检测</h3>
+          <div id="anomaliesList"></div>
+        </div>
+
+        <div class="chart-card full-width">
+          <h3>提交关联性分析 <span id="relationshipStats" class="chart-subtitle"></span></h3>
+          <div class="chart-controls">
+            <div class="control-group">
+              <label>相似度阈值:</label>
+              <input type="range" id="similarityThreshold" min="0" max="1" step="0.05" value="0.4">
+              <span id="thresholdValue">0.4</span>
+            </div>
+            <div class="control-group">
+              <label>显示模式:</label>
+              <select id="displayMode">
+                <option value="network">连线图</option>
+                <option value="groups">分组视图</option>
+              </select>
+            </div>
+          </div>
+          <div id="networkChart"></div>
+          <div id="groupsView" style="display: none;"></div>
+        </div>
+
+        <div class="chart-card full-width">
+          <h3>关联提交分组</h3>
+          <div id="relatedGroups"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="detailModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">提交详情</h3>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="similarityDetails"></div>
+          <div id="commitCompare"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../node_modules/d3/dist/d3.min.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
